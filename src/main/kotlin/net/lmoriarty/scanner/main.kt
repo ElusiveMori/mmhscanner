@@ -1,5 +1,6 @@
 package net.lmoriarty.scanner
 
 fun main(args: Array<String>) {
-    println("Initial commit!");
+    val extractor = MakeMeHostExtractor()
+    println(extractor.extractRows())
 }
