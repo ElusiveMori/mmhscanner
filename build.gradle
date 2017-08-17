@@ -28,7 +28,11 @@ repositories {
 dependencies {
     compile "org.jetbrains.kotlin:kotlin-stdlib-jre8:$kotlin_version"
     compile "com.github.austinv11:Discord4J:2.8.4"
-    compile group: 'org.jsoup', name: 'jsoup', version: '1.8.3'
+    compile "org.jsoup:jsoup:1.8.3"
+    compile "com.github.salomonbrys.kotson:kotson:2.5.0"
+    compile group: 'org.apache.logging.log4j', name: 'log4j-api', version: '2.8.2'
+    compile group: 'org.apache.logging.log4j', name: 'log4j-core', version: '2.8.2'
+    compile group: 'org.apache.logging.log4j', name: 'log4j-slf4j-impl', version: '2.8.2'
 
 }
 

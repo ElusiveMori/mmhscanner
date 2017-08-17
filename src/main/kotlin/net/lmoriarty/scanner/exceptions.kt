@@ -6,3 +6,5 @@ class DataExtractException : Exception {
 }
 
 class MakeMeHostConnectException(message: String, cause: Throwable) : Exception(message, cause)
+
+class InvalidDiscordTokenException(message: String) : Exception(message)
