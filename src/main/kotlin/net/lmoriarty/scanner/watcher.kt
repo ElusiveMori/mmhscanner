@@ -18,7 +18,8 @@ class Watcher(val bot: ChatBot) {
             Regex("(\\brotrp\\b)"),
             Regex("(\\baoc\\b|\\baocrp\\b)"),
             Regex("(\\broleplay\\b|\\brp\\b)"),
-            Regex("(\\bgcg\\b)")
+            Regex("(\\bgcg\\b)"),
+            Regex("(\\bkot\\b|titans land|titan land|\\btl\\b)")
     )
 
     init {
