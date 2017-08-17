@@ -8,7 +8,7 @@ import java.io.File
 private val tokenPlaceholder = "PUT_TOKEN_HERE"
 
 object Settings {
-    data class ChatBotSettings(var token: String = tokenPlaceholder, var channels: MutableList<String> = ArrayList())
+    data class ChatBotSettings(var token: String = tokenPlaceholder, var channels: MutableList<Long> = ArrayList())
 
     private val gson: Gson = GsonBuilder().setPrettyPrinting().create()
     private val settingsFile = File("settings.json")
@@ -17,7 +17,7 @@ object Settings {
     var token: String
         get() = settings.token
         set(value) {settings.token = value}
-    var channels: MutableList<String>
+    var channels: MutableList<Long>
         get() = settings.channels
         set(value) {settings.channels = value}
 

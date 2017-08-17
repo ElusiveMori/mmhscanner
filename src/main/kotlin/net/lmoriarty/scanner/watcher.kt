@@ -1,31 +1,28 @@
 package net.lmoriarty.scanner
 
-import sx.blah.discord.handle.obj.IMessage
 import kotlin.concurrent.timer
 
 /**
  * Holds info about a single MMH bot account, as much as is relevant to us.
  */
-data class GameInfo(var name: String, var associatedMessage: IMessage?, var updated: Boolean, var pattern: Regex)
+data class GameInfo(var name: String, var updated: Boolean, var pattern: Regex, var oldName: String)
 
 /**
  * Scans the MMH roster and notifies the discord bot when it should post notifications.
  */
-class Watcher {
+class Watcher(val bot: ChatBot) {
     // key is mmh bot account name
     private val registry: MutableMap<String, GameInfo> = HashMap()
     // TODO: add loading from config, modification with commands
     private val patterns = listOf(
-            Regex(".*rotrp.*"),
-            Regex(".*aoc.*"),
-            Regex(".*roleplay.*")
+            Regex("(\\brotrp\\b)"),
+            Regex("(\\baoc\\b|\\baocrp\\b)"),
+            Regex("(\\broleplay\\b|\\brp\\b)"),
+            Regex("(\\bgcg\\b)")
     )
 
-
     init {
-
-
-        timer(period = 5000, action = {scan()})
+        timer(initialDelay = 5000, period = 5000, action = {scan()})
     }
 
     /**
@@ -34,7 +31,7 @@ class Watcher {
      */
     private fun shouldWatch(row: GameRow): Regex? {
         for (pattern in patterns) {
-            if (pattern.matches(row.currentGame.toLowerCase())) {
+            if (pattern.containsMatchIn(row.currentGame.toLowerCase())) {
                 return pattern
             }
         }
@@ -55,32 +52,35 @@ class Watcher {
                 if (info != null) {
                     if (info.pattern == regex) {
                         if (info.name != data.currentGame) {
+                            info.oldName = info.name
                             info.name = data.currentGame
                             log.info("Game is updated: " + data.currentGame)
-                            // TODO: update message/post new one
+                            bot.onGameUpdated(info)
                         }
                     } else {
+                        bot.onGameUnhosted(info)
+                        registry.remove(data.botName)
                         info = null
                     }
                 }
 
                 if (info == null) {
-                    log.info("Game created: " + data.currentGame)
-                    // TODO: send message
-                    info = GameInfo(data.currentGame, null, false, regex)
+                    info = GameInfo(data.currentGame, false, regex, "")
+                    bot.onGameHosted(info)
                     registry[data.botName] = info
                 }
 
                 info.updated = true
             }
 
-            registry.filter {
-                if (!it.value.updated) {
-                    log.info("Game unhosted: " + it.value.name)
-                    return@filter false
-                }
+            val iterator = registry.iterator()
+            while (iterator.hasNext()) {
+                val info = iterator.next().value
 
-                return@filter true
+                if (!info.updated) {
+                    bot.onGameUnhosted(info)
+                    iterator.remove()
+                }
             }
 
         } catch (e: MakeMeHostConnectException) {

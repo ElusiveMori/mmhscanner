@@ -3,14 +3,13 @@ package net.lmoriarty.scanner
 import sx.blah.discord.api.ClientBuilder
 import sx.blah.discord.api.IDiscordClient
 import sx.blah.discord.api.events.EventSubscriber
+import sx.blah.discord.handle.impl.events.ReadyEvent
 import sx.blah.discord.handle.impl.events.guild.channel.message.MessageReceivedEvent
-import sx.blah.discord.handle.obj.IGuild
-import sx.blah.discord.handle.obj.IMessage
-import sx.blah.discord.handle.obj.IUser
-import sx.blah.discord.handle.obj.Permissions
+import sx.blah.discord.handle.obj.*
 
 class ChatBot {
     private var client: IDiscordClient? = null
+    private val notificationChannels: MutableList<IChannel> = ArrayList()
 
     init {
         val builder = ClientBuilder()
@@ -20,7 +19,8 @@ class ChatBot {
     }
 
     private fun canUserManage(user: IUser, guild: IGuild): Boolean {
-        return user.getPermissionsForGuild(guild).contains(Permissions.ADMINISTRATOR)
+        val permissions = user.getPermissionsForGuild(guild)
+        return permissions.contains(Permissions.ADMINISTRATOR) || permissions.contains(Permissions.MANAGE_SERVER)
     }
 
     private fun registerChannel(message: IMessage) {
@@ -28,10 +28,11 @@ class ChatBot {
         val guild = message.guild
 
         if (canUserManage(user, guild)) {
-            if (!Settings.channels.contains(message.channel.stringID)) {
-                Settings.channels.add(message.channel.stringID)
+            if (!Settings.channels.contains(message.channel.longID)) {
+                Settings.channels.add(message.channel.longID)
                 Settings.writeSettings()
                 message.channel.sendMessage("Channel registered for notifications.")
+                notificationChannels.add(message.channel)
             } else {
                 message.channel.sendMessage("I can't do that, Dave.")
             }
@@ -43,10 +44,11 @@ class ChatBot {
         val guild = message.guild
 
         if (canUserManage(user, guild)) {
-            if (Settings.channels.contains(message.channel.stringID)) {
-                Settings.channels.remove(message.channel.stringID)
+            if (Settings.channels.contains(message.channel.longID)) {
+                Settings.channels.remove(message.channel.longID)
                 Settings.writeSettings()
                 message.channel.sendMessage("Channel unregistered for notifications.")
+                notificationChannels.remove(message.channel)
             } else {
                 message.channel.sendMessage("I can't do that, Dave.")
             }
@@ -71,8 +73,58 @@ class ChatBot {
         }
     }
 
+    private fun postInNotificationChannels(text: String) {
+        for (channel in notificationChannels) {
+            channel.sendMessage(text)
+        }
+    }
+
+    fun onGameHosted(gameInfo: GameInfo) {
+        val text = """
+            |```A game has been hosted on MMH.
+            |
+            |Name: ${gameInfo.name}```
+            """.trimMargin()
+
+        postInNotificationChannels(text)
+    }
+
+    fun onGameUpdated(gameInfo: GameInfo) {
+        val text = """
+            |```A game has been repubbed on MMH.
+            |
+            |Name: ${gameInfo.oldName} -> ${gameInfo.name}```
+            """.trimMargin()
+
+        postInNotificationChannels(text)
+    }
+
+    fun onGameUnhosted(gameInfo: GameInfo) {
+        val text = """
+            |```A game has started or has been unhosted.
+            |
+            |Name: ${gameInfo.name}```
+            """.trimMargin()
+
+        postInNotificationChannels(text)
+    }
+
     @EventSubscriber
-    private fun handleMessage(event: MessageReceivedEvent) {
+    fun handleBotLoad(event: ReadyEvent) {
+        for (id in Settings.channels) {
+            val channel = client?.getChannelByID(id)
+
+            if (channel != null) {
+                notificationChannels.add(channel)
+            }
+        }
+
+        Watcher(this)
+        log.info("Watcher started")
+    }
+
+    @EventSubscriber
+    fun handleMessage(event: MessageReceivedEvent) {
         dispatchCommand(event.message)
     }
 }

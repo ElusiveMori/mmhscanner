@@ -6,6 +6,5 @@ import org.apache.logging.log4j.Logger
 val log: Logger = LogManager.getLogger()
 
 fun main(args: Array<String>) {
-    val watcher = Watcher()
     val chatbot = ChatBot()
 }
