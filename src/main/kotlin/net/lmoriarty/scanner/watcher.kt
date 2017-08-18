@@ -15,11 +15,14 @@ class Watcher(val bot: ChatBot) {
     private val registry: MutableMap<String, GameInfo> = HashMap()
     // TODO: add loading from config, modification with commands
     private val patterns = listOf(
-            Regex("(\\brotrp\\b)"),
-            Regex("(\\baoc\\b|\\baocrp\\b)"),
-            Regex("(\\broleplay\\b|\\brp\\b)"),
-            Regex("(\\bgcg\\b)"),
-            Regex("(\\bkot\\b|titans land|titan land|\\btl\\b)")
+            Regex("""(rotrp)"""),
+            Regex("""(yarp)"""),
+            Regex("""(sotdrp)"""),
+            Regex("""(aoc|aocrp)"""),
+            Regex("""(gcg)"""),
+            Regex("""(\bkot\b|titans land|titan land|\btl\b)"""),
+            Regex("""(\bload\b|life of a dragon)"""),
+            Regex("""(roleplay|\brp\b)""")
     )
 
     init {
