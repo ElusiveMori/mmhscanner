@@ -81,9 +81,7 @@ class ChatBot {
 
     fun onGameHosted(gameInfo: GameInfo) {
         val text = """
-            |```A game has been hosted on MMH.
-            |
-            |Name: ${gameInfo.name}```
+            |```Game hosted: ${gameInfo.name}```
             """.trimMargin()
 
         postInNotificationChannels(text)
@@ -91,9 +89,7 @@ class ChatBot {
 
     fun onGameUpdated(gameInfo: GameInfo) {
         val text = """
-            |```A game has been repubbed on MMH.
-            |
-            |Name: ${gameInfo.oldName} -> ${gameInfo.name}```
+            |```Game renamed: ${gameInfo.oldName} -> ${gameInfo.name}```
             """.trimMargin()
 
         postInNotificationChannels(text)
@@ -101,9 +97,7 @@ class ChatBot {
 
     fun onGameUnhosted(gameInfo: GameInfo) {
         val text = """
-            |```A game has started or has been unhosted.
-            |
-            |Name: ${gameInfo.name}```
+            |```Game started/unhosted: ${gameInfo.name}```
             """.trimMargin()
 
         postInNotificationChannels(text)
