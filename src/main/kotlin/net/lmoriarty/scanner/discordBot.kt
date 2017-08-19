@@ -185,7 +185,7 @@ class ChatBot {
 
         if (canUserManage(user, guild)) {
             if (isNotifiableChannel(channel)) {
-                notificationTargets.remove(channel.longID)
+                notificationTargets.remove(channel.longID)?.kill()
                 commitSettings()
 
                 makeRequest { channel.sendMessage("Channel unregistered for notifications, Dave.") }
@@ -270,6 +270,7 @@ class ChatBot {
         private val executor: ThreadPoolExecutor
         // use a treemap for strict ordering
         private val watchedGames = TreeMap<String, GameInfo>()
+        private val updateTimer: Timer
 
         init {
             val threadFactory = ThreadFactory {
@@ -283,9 +284,15 @@ class ChatBot {
 
             executor.submit {
                 bot.clearMessagesInChannel(channel)
+
+                for ((_, info) in bot.watcher.getAll()) {
+                    processGameCreate(info)
+                }
             }
 
-            timer(initialDelay = 0, period = 10000, action = { updateInfoMessage() })
+            updateTimer = timer(initialDelay = 0, period = 10000, action = {
+                executor.submit{ updateInfoMessage() }
+            })
         }
 
         private fun sendInfoMessage(string: String) {
@@ -346,6 +353,10 @@ class ChatBot {
                 watchedGames.remove(info.botName)
                 updateInfoMessage()
             }
+        }
+
+        fun kill() {
+            updateTimer.cancel()
         }
     }
 }

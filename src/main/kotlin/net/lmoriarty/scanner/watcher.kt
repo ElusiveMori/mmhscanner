@@ -105,4 +105,7 @@ class Watcher(val bot: ChatBot) {
         }
     }
 
+    fun getAll(): Map<String, GameInfo> {
+        return registry
+    }
 }
