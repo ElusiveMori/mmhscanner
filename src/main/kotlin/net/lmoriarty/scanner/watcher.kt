@@ -15,7 +15,7 @@ enum class GameType(pattern: String) {
     ROTRP("""(rotrp)"""),
     YARP("""(yarp)"""),
     SOTDRP("""(sotdrp)"""),
-    AOC("""(aoc|aocl|aocrp)"""),
+    AOC("""(\baoc\b|aocl|aocrp)"""),
     GCG("""(gcg|guilty crown)"""),
     TL("""(\bkot\b|titans land|titan land|\btl\b)"""),
     LOAD("""(\bload\b|life of a dragon)"""),

@@ -29,93 +29,6 @@ val messageHeader = """
 |```Type "-mmh list" to see which game types are available!```
 """.trimMargin()
 
-/**
- * We run the updates of each target in a single-threaded pool because
- * we don't want multiple updates to interfere with one another, but we
- * want targets to be independent from each other.
- */
-class NotificationTarget(val channel: IChannel,
-                         val bot: ChatBot,
-                         val types: MutableSet<GameType> = HashSet()) {
-    private var lastMessage: IMessage? = null
-    private val executor: ThreadPoolExecutor
-    // use a treemap for strict ordering
-    private val watchedGames = TreeMap<String, GameInfo>()
-
-    init {
-        val threadFactory = ThreadFactory {
-            val thread = Executors.defaultThreadFactory().newThread(it)
-            thread.name = "MMH Scanner Channel Update Thread (${channel.name})"
-            thread.isDaemon = false
-            return@ThreadFactory thread
-        }
-
-        executor = ThreadPoolExecutor(1, 1, 0L, TimeUnit.MILLISECONDS, LinkedBlockingQueue(), threadFactory)
-
-        timer(initialDelay = 0, period = 10000, action = { updateInfoMessage() })
-    }
-
-    private fun sendInfoMessage(string: String) {
-        val lastMessage = lastMessage
-
-        if (lastMessage == null) {
-            makeRequest { this.lastMessage = channel.sendMessage(string) }
-        } else {
-            val history = makeRequest { channel.getMessageHistory(32) }
-            if (history.latestMessage != lastMessage) {
-                makeRequest { lastMessage.delete() }
-                makeRequest { this.lastMessage = channel.sendMessage(string) }
-            } else {
-                makeRequest { lastMessage.edit(string) }
-            }
-        }
-    }
-
-    private fun buildInfoMessage(): String {
-        if (watchedGames.size > 0) {
-            var message = "```Currently hosted games:\n|\n"
-            var longestBotName = 0
-
-            for ((bot, _) in watchedGames) {
-                longestBotName = if (bot.length > longestBotName) bot.length else longestBotName
-            }
-
-            for ((bot, info) in watchedGames) {
-                message += "| ${bot + " ".repeat(longestBotName - bot.length)}  ---  ${info.name}\n"
-            }
-
-            message += "```"
-            return messageHeader + message
-        } else {
-            return messageHeader + "```There are currently no hosted games.```"
-        }
-    }
-
-    private fun updateInfoMessage() {
-        sendInfoMessage(buildInfoMessage())
-    }
-
-    fun processGameUpdate(info: GameInfo) {
-        executor.submit {
-            updateInfoMessage()
-        }
-    }
-
-    fun processGameCreate(info: GameInfo) {
-        executor.submit {
-            watchedGames[info.botName] = info
-            updateInfoMessage()
-        }
-    }
-
-    fun processGameRemove(info: GameInfo) {
-        executor.submit {
-            watchedGames.remove(info.botName)
-            updateInfoMessage()
-        }
-    }
-}
-
 class ChatBot {
     val watcher: Watcher
     val client: IDiscordClient
@@ -142,7 +55,7 @@ class ChatBot {
             return@ThreadFactory thread
         }
 
-        // we're going to be blocking in our requests, so to avoid thread starving
+        // we're going to be blocking in our handlers, so to avoid thread starving
         // we use an unbounded thread pool
         val executor = ThreadPoolExecutor(8, Int.MAX_VALUE, 60, TimeUnit.SECONDS, LinkedBlockingQueue(), listenerThreadFactory)
         requestExecutor = ThreadPoolExecutor(16, 16, 0, TimeUnit.SECONDS, LinkedBlockingQueue(), requestThreadFactory)
@@ -162,19 +75,18 @@ class ChatBot {
     }
 
     private fun commitSettings() {
+        Settings.channels.clear()
         for ((id, target) in notificationTargets) {
-            var channel = Settings.channels[id]
-
-            if (channel == null) {
-                channel = Settings.NotificationChannel()
-                Settings.channels[id] = channel
-            }
-
+            val channel = Settings.NotificationChannel()
             channel.types = HashSet(target.types)
+            Settings.channels[id] = channel
         }
+
+        Settings.writeSettings()
     }
 
     private fun retrieveSettings() {
+        Settings.readSettings()
         notificationTargets.clear()
         owner = null
 
@@ -205,7 +117,35 @@ class ChatBot {
         return permissions.contains(Permissions.ADMINISTRATOR) || permissions.contains(Permissions.MANAGE_SERVER)
     }
 
-    private fun listGameTypes(message: IMessage) {
+    private fun clearMessagesInChannel(channel: IChannel) {
+        val toDelete = ArrayList<IMessage>()
+        val history = makeRequest { channel.fullMessageHistory }
+
+        log.info("Fetched ${history.size} messages in preparation for deletion.")
+
+        for (historyMessage in history) {
+            if (historyMessage.author == client.ourUser) {
+                toDelete.add(historyMessage)
+            }
+        }
+
+        log.info("${toDelete.size} messages will be deleted.")
+
+        // preallocate size just in case
+        val futureList = ArrayList<Future<*>>(toDelete.size)
+        for (deletableMessage in toDelete) {
+            futureList.add(requestExecutor.submit { makeRequest { deletableMessage.delete() } })
+        }
+
+        // wait for all tasks to complete
+        for (future in futureList) {
+            future.get()
+        }
+
+        log.info("Deleted ${toDelete.size} messages.")
+    }
+
+    private fun commandListGameTypes(message: IMessage) {
         val channel = message.channel
 
         if (isNotifiableChannel(channel)) {
@@ -221,7 +161,7 @@ class ChatBot {
         }
     }
 
-    private fun registerChannel(message: IMessage) {
+    private fun commandRegisterChannel(message: IMessage) {
         val user = message.author
         val guild = message.guild
         val channel = message.channel
@@ -238,7 +178,7 @@ class ChatBot {
         }
     }
 
-    private fun unregisterChannel(message: IMessage) {
+    private fun commandUnregisterChannel(message: IMessage) {
         val user = message.author
         val guild = message.guild
         val channel = message.channel
@@ -255,38 +195,14 @@ class ChatBot {
         }
     }
 
-    private fun clearMessages(message: IMessage) {
+    private fun commandClearMessages(message: IMessage) {
         val user = message.author
         val guild = message.guild
         val channel = message.channel
 
         if (canUserManage(user, guild)) {
             if (isNotifiableChannel(channel)) {
-                val toDelete = ArrayList<IMessage>()
-                val history = makeRequest { channel.fullMessageHistory }
-
-                log.info("Fetched ${history.size} messages in preparation for deletion.")
-
-                for (historyMessage in history) {
-                    if (historyMessage.author == client.ourUser) {
-                        toDelete.add(historyMessage)
-                    }
-                }
-
-                log.info("${toDelete.size} messages will be deleted.")
-
-                // preallocate size just in case
-                val futureList = ArrayList<Future<*>>(toDelete.size)
-                for (deletableMessage in toDelete) {
-                    futureList.add(requestExecutor.submit { makeRequest { deletableMessage.delete() } })
-                }
-
-                // wait for all tasks to complete
-                for (future in futureList) {
-                    future.get()
-                }
-
-                log.info("Deleted ${toDelete.size} messages.")
+                clearMessagesInChannel(channel)
 
                 makeRequest { channel.sendMessage("I've cleared all my messages, Dave.") }
             }
@@ -305,10 +221,10 @@ class ChatBot {
             //val arg = if (split.size > 2) split.subList(2, split.size).reduce { acc, s -> acc + " " + s } else ""
 
             when (command) {
-                "register" -> registerChannel(message)
-                "unregister" -> unregisterChannel(message)
-                "clear" -> clearMessages(message)
-                "list" -> listGameTypes(message)
+                "register" -> commandRegisterChannel(message)
+                "unregister" -> commandUnregisterChannel(message)
+                "clear" -> commandClearMessages(message)
+                "list" -> commandListGameTypes(message)
             }
         }
     }
@@ -340,5 +256,96 @@ class ChatBot {
 
     private fun handleMessage(event: MessageReceivedEvent) {
         dispatchCommand(event.message)
+    }
+
+    /**
+     * We run the updates of each target in a single-threaded pool because
+     * we don't want multiple updates to interfere with one another, but we
+     * want targets to be independent from each other.
+     */
+    class NotificationTarget(val channel: IChannel,
+                             val bot: ChatBot,
+                             val types: MutableSet<GameType> = HashSet()) {
+        private var lastMessage: IMessage? = null
+        private val executor: ThreadPoolExecutor
+        // use a treemap for strict ordering
+        private val watchedGames = TreeMap<String, GameInfo>()
+
+        init {
+            val threadFactory = ThreadFactory {
+                val thread = Executors.defaultThreadFactory().newThread(it)
+                thread.name = "MMH Scanner Channel Update Thread (${channel.name})"
+                thread.isDaemon = false
+                return@ThreadFactory thread
+            }
+
+            executor = ThreadPoolExecutor(1, 1, 0L, TimeUnit.MILLISECONDS, LinkedBlockingQueue(), threadFactory)
+
+            executor.submit {
+                bot.clearMessagesInChannel(channel)
+            }
+
+            timer(initialDelay = 0, period = 10000, action = { updateInfoMessage() })
+        }
+
+        private fun sendInfoMessage(string: String) {
+            val lastMessage = lastMessage
+
+            if (lastMessage == null) {
+                makeRequest { this.lastMessage = channel.sendMessage(string) }
+            } else {
+                val history = makeRequest { channel.getMessageHistory(32) }
+                if (history.latestMessage != lastMessage) {
+                    makeRequest { lastMessage.delete() }
+                    makeRequest { this.lastMessage = channel.sendMessage(string) }
+                } else {
+                    makeRequest { lastMessage.edit(string) }
+                }
+            }
+        }
+
+        private fun buildInfoMessage(): String {
+            if (watchedGames.size > 0) {
+                var message = "```Currently hosted games:\n|\n"
+                var longestBotName = 0
+
+                for ((bot, _) in watchedGames) {
+                    longestBotName = if (bot.length > longestBotName) bot.length else longestBotName
+                }
+
+                for ((bot, info) in watchedGames) {
+                    message += "| ${bot + " ".repeat(longestBotName - bot.length)}  ---  ${info.name}\n"
+                }
+
+                message += "```"
+                return messageHeader + message
+            } else {
+                return messageHeader + "```There are currently no hosted games.```"
+            }
+        }
+
+        private fun updateInfoMessage() {
+            sendInfoMessage(buildInfoMessage())
+        }
+
+        fun processGameUpdate(info: GameInfo) {
+            executor.submit {
+                updateInfoMessage()
+            }
+        }
+
+        fun processGameCreate(info: GameInfo) {
+            executor.submit {
+                watchedGames[info.botName] = info
+                updateInfoMessage()
+            }
+        }
+
+        fun processGameRemove(info: GameInfo) {
+            executor.submit {
+                watchedGames.remove(info.botName)
+                updateInfoMessage()
+            }
+        }
     }
 }
