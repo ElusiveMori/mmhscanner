@@ -5,10 +5,16 @@ import com.google.gson.Gson
 import com.google.gson.GsonBuilder
 import java.io.File
 
-private val tokenPlaceholder = "PUT_TOKEN_HERE"
+private const val tokenPlaceholder = "PUT_TOKEN_HERE"
 
+/**
+ * Stores settings as retrieved/written to the JSON file.
+ */
 object Settings {
-    data class ChatBotSettings(var token: String = tokenPlaceholder, var channels: MutableList<Long> = ArrayList())
+    data class NotificationChannel(var types: MutableSet<GameType> = HashSet())
+    data class ChatBotSettings(var token: String = tokenPlaceholder,
+                               var channels: MutableMap<Long, NotificationChannel> = HashMap(),
+                               var owner: Long = 0)
 
     private val gson: Gson = GsonBuilder().setPrettyPrinting().create()
     private val settingsFile = File("settings.json")
@@ -17,9 +23,12 @@ object Settings {
     var token: String
         get() = settings.token
         set(value) {settings.token = value}
-    var channels: MutableList<Long>
+    var channels: MutableMap<Long, NotificationChannel>
         get() = settings.channels
         set(value) {settings.channels = value}
+    var owner: Long
+        get() = settings.owner
+        set(value) {settings.owner = value}
 
     init {
         if (settingsFile.createNewFile()) {
@@ -35,7 +44,8 @@ object Settings {
         settingsFile.bufferedReader().use {
             val settings = gson.fromJson<ChatBotSettings>(it)
             token = settings.token
-            channels = ArrayList(settings.channels)
+            channels = HashMap(settings.channels)
+            owner = settings.owner
             log.info("Read settings:\n" + this)
         }
     }

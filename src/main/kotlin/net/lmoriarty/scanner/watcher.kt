@@ -5,7 +5,20 @@ import kotlin.concurrent.timer
 /**
  * Holds info about a single MMH bot account, as much as is relevant to us.
  */
-data class GameInfo(var name: String, var updated: Boolean, var pattern: Regex, var oldName: String)
+data class GameInfo(var name: String, var updated: Boolean, var gameType: GameType, var oldName: String)
+
+enum class GameType(pattern: String) {
+    ROTRP("""(rotrp)"""),
+    YARP("""(yarp)"""),
+    SOTDRP("""(sotdrp)"""),
+    AOC("""(aoc|aocl|aocrp)"""),
+    GCG("""(gcg|guilty crown)"""),
+    TL("""(\bkot\b|titans land|titan land|\btl\b)"""),
+    LOAD("""(\bload\b|life of a dragon)"""),
+    RP("""(roleplay|\brp\b)""");
+
+    val regex = Regex(pattern)
+}
 
 /**
  * Scans the MMH roster and notifies the discord bot when it should post notifications.
@@ -13,17 +26,6 @@ data class GameInfo(var name: String, var updated: Boolean, var pattern: Regex, 
 class Watcher(val bot: ChatBot) {
     // key is mmh bot account name
     private val registry: MutableMap<String, GameInfo> = HashMap()
-    // TODO: add loading from config, modification with commands
-    private val patterns = listOf(
-            Regex("""(rotrp)"""),
-            Regex("""(yarp)"""),
-            Regex("""(sotdrp)"""),
-            Regex("""(aoc|aocrp)"""),
-            Regex("""(gcg)"""),
-            Regex("""(\bkot\b|titans land|titan land|\btl\b)"""),
-            Regex("""(\bload\b|life of a dragon)"""),
-            Regex("""(roleplay|\brp\b)""")
-    )
 
     init {
         timer(initialDelay = 5000, period = 5000, action = {scan()})
@@ -33,10 +35,10 @@ class Watcher(val bot: ChatBot) {
      * Returns which regex matched the game, if any
      * or null otherwise
      */
-    private fun shouldWatch(row: GameRow): Regex? {
-        for (pattern in patterns) {
-            if (pattern.containsMatchIn(row.currentGame.toLowerCase())) {
-                return pattern
+    private fun shouldWatch(row: GameRow): GameType? {
+        for (gameType in GameType.values()) {
+            if (gameType.regex.containsMatchIn(row.currentGame.toLowerCase())) {
+                return gameType
             }
         }
 
@@ -50,26 +52,29 @@ class Watcher(val bot: ChatBot) {
 
             for (row in rows) {
                 val data = row.first
-                val regex = row.second as Regex
+                val gameType = row.second as GameType
                 var info = registry[row.first.botName]
 
+                // we already had a tracked game on this bot
                 if (info != null) {
-                    if (info.pattern == regex) {
+                    if (info.gameType == gameType) {
+                        // update if name got changed
                         if (info.name != data.currentGame) {
                             info.oldName = info.name
                             info.name = data.currentGame
-                            log.info("Game is updated: " + data.currentGame)
                             bot.onGameUpdated(info)
                         }
                     } else {
-                        bot.onGameUnhosted(info)
+                        // it's a different game - previous one got unhosted/started (very rare case)
+                        bot.onGameRemoved(info)
                         registry.remove(data.botName)
                         info = null
                     }
                 }
 
+                // a new game has been hosted on the bot
                 if (info == null) {
-                    info = GameInfo(data.currentGame, false, regex, "")
+                    info = GameInfo(data.currentGame, false, gameType, "")
                     bot.onGameHosted(info)
                     registry[data.botName] = info
                 }
@@ -81,16 +86,19 @@ class Watcher(val bot: ChatBot) {
             while (iterator.hasNext()) {
                 val info = iterator.next().value
 
+                // if game wasn't updated, means it's gone
                 if (!info.updated) {
-                    bot.onGameUnhosted(info)
+                    bot.onGameRemoved(info)
                     iterator.remove()
                 }
             }
-
         } catch (e: MakeMeHostConnectException) {
-            log.warn(e)
+            // it's not critical if MMH goes down
+            log.warn("MMH Connection Warning:", e)
+        } catch (e: Exception) {
+            // don't let the exception propagate, because it will kill the timer
+            log.error("Generic Error:", e)
         }
-
     }
 
 }
