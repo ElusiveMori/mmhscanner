@@ -10,6 +10,7 @@ import sx.blah.discord.util.RateLimitException
 import java.util.*
 import java.util.concurrent.*
 import kotlin.collections.ArrayList
+import kotlin.concurrent.timer
 
 /**
  * Handles RateLimitException and retries if encounters. Blocks the thread.
@@ -24,18 +25,105 @@ fun <T> makeRequest(action: () -> T): T {
     }
 }
 
+val messageHeader = """
+|```Type "-mmh list" to see which game types are available!```
+""".trimMargin()
+
+/**
+ * We run the updates of each target in a single-threaded pool because
+ * we don't want multiple updates to interfere with one another, but we
+ * want targets to be independent from each other.
+ */
 class NotificationTarget(val channel: IChannel,
-                         var lastMessage: IMessage?,
+                         val bot: ChatBot,
                          val types: MutableSet<GameType> = HashSet()) {
+    private var lastMessage: IMessage? = null
+    private val executor: ThreadPoolExecutor
+    // use a treemap for strict ordering
+    private val watchedGames = TreeMap<String, GameInfo>()
+
+    init {
+        val threadFactory = ThreadFactory {
+            val thread = Executors.defaultThreadFactory().newThread(it)
+            thread.name = "MMH Scanner Channel Update Thread (${channel.name})"
+            thread.isDaemon = false
+            return@ThreadFactory thread
+        }
+
+        executor = ThreadPoolExecutor(1, 1, 0L, TimeUnit.MILLISECONDS, LinkedBlockingQueue(), threadFactory)
+
+        timer(initialDelay = 0, period = 10000, action = { updateInfoMessage() })
+    }
+
+    private fun sendInfoMessage(string: String) {
+        val lastMessage = lastMessage
+
+        if (lastMessage == null) {
+            makeRequest { this.lastMessage = channel.sendMessage(string) }
+        } else {
+            val history = makeRequest { channel.getMessageHistory(32) }
+            if (history.latestMessage != lastMessage) {
+                makeRequest { lastMessage.delete() }
+                makeRequest { this.lastMessage = channel.sendMessage(string) }
+            } else {
+                makeRequest { lastMessage.edit(string) }
+            }
+        }
+    }
+
+    private fun buildInfoMessage(): String {
+        if (watchedGames.size > 0) {
+            var message = "```Currently hosted games:\n|\n"
+            var longestBotName = 0
+
+            for ((bot, _) in watchedGames) {
+                longestBotName = if (bot.length > longestBotName) bot.length else longestBotName
+            }
+
+            for ((bot, info) in watchedGames) {
+                message += "| ${bot + " ".repeat(longestBotName - bot.length)}  ---  ${info.name}\n"
+            }
+
+            message += "```"
+            return messageHeader + message
+        } else {
+            return messageHeader + "```There are currently no hosted games.```"
+        }
+    }
+
+    private fun updateInfoMessage() {
+        sendInfoMessage(buildInfoMessage())
+    }
+
+    fun processGameUpdate(info: GameInfo) {
+        executor.submit {
+            updateInfoMessage()
+        }
+    }
+
+    fun processGameCreate(info: GameInfo) {
+        executor.submit {
+            watchedGames[info.botName] = info
+            updateInfoMessage()
+        }
+    }
+
+    fun processGameRemove(info: GameInfo) {
+        executor.submit {
+            watchedGames.remove(info.botName)
+            updateInfoMessage()
+        }
+    }
 }
 
-
 class ChatBot {
-    private var client: IDiscordClient
-    private var watcher: Watcher? = null
-    private val notificationTargets = HashMap<Long, NotificationTarget>()
+    val watcher: Watcher
+    val client: IDiscordClient
+
+    private val notificationTargets = ConcurrentHashMap<Long, NotificationTarget>()
     // used for parallel execution of requests
     private val requestExecutor: ThreadPoolExecutor
+
     private var owner: IUser? = null
 
     init {
@@ -69,6 +157,8 @@ class ChatBot {
         client.dispatcher.registerListener(executor, IListener<MessageReceivedEvent> {
             handleMessage(it)
         })
+
+        watcher = Watcher(this)
     }
 
     private fun commitSettings() {
@@ -90,8 +180,7 @@ class ChatBot {
 
         for ((id, notificationChannel) in Settings.channels) {
             val channel = client.getChannelByID(id)
-
-            val target = NotificationTarget(channel, null, HashSet(notificationChannel.types))
+            val target = NotificationTarget(channel, this, HashSet(notificationChannel.types))
             notificationTargets[id] = target
             log.info("Retrieved notification target (${channel.name}, ${target.types}).")
         }
@@ -104,7 +193,7 @@ class ChatBot {
     }
 
     private fun isNotifiableChannel(channel: IChannel): Boolean {
-        return channel.longID in notificationTargets
+        return notificationTargets.containsKey(channel.longID)
     }
 
     private fun canUserManage(user: IUser, guild: IGuild): Boolean {
@@ -117,22 +206,18 @@ class ChatBot {
     }
 
     private fun listGameTypes(message: IMessage) {
-        val user = message.author
-        val guild = message.guild
         val channel = message.channel
 
-        if (canUserManage(user, guild)) {
-            if (isNotifiableChannel(channel)) {
-                var response = "Here's the supported game types, Dave:\n```"
+        if (isNotifiableChannel(channel)) {
+            var response = "Here's the supported game types, Dave:\n```"
 
-                for (gameType in GameType.values()) {
-                    response += "${gameType} -> ${gameType.regex}\n"
-                }
-
-                response += "```"
-
-                makeRequest { message.channel.sendMessage(response) }
+            for (gameType in GameType.values()) {
+                response += "${gameType} -> ${gameType.regex}\n"
             }
+
+            response += "```"
+
+            makeRequest { message.channel.sendMessage(response) }
         }
     }
 
@@ -143,7 +228,7 @@ class ChatBot {
 
         if (canUserManage(user, guild)) {
             if (!isNotifiableChannel(channel)) {
-                notificationTargets[channel.longID] = NotificationTarget(channel, null, HashSet())
+                notificationTargets[channel.longID] = NotificationTarget(channel, this, HashSet())
                 commitSettings()
 
                 makeRequest { channel.sendMessage("Channel registered for notifications, Dave.") }
@@ -176,7 +261,7 @@ class ChatBot {
         val channel = message.channel
 
         if (canUserManage(user, guild)) {
-            if (channel.longID in notificationTargets) {
+            if (isNotifiableChannel(channel)) {
                 val toDelete = ArrayList<IMessage>()
                 val history = makeRequest { channel.fullMessageHistory }
 
@@ -228,40 +313,28 @@ class ChatBot {
         }
     }
 
-    private fun postInNotificationChannels(text: String) {
-        for ((id, target) in notificationTargets) {
-            makeRequest { target.channel.sendMessage(text) }
+    fun onGameHosted(gameInfo: GameInfo) {
+        for ((_, target) in notificationTargets) {
+            target.processGameCreate(gameInfo)
         }
     }
 
-    fun onGameHosted(gameInfo: GameInfo) {
-        val text = """
-            |```Game hosted: ${gameInfo.name}```
-            """.trimMargin()
-
-        postInNotificationChannels(text)
-    }
-
     fun onGameUpdated(gameInfo: GameInfo) {
-        val text = """
-            |```Game renamed: ${gameInfo.oldName} -> ${gameInfo.name}```
-            """.trimMargin()
-
-        postInNotificationChannels(text)
+        for ((_, target) in notificationTargets) {
+            target.processGameUpdate(gameInfo)
+        }
     }
 
     fun onGameRemoved(gameInfo: GameInfo) {
-        val text = """
-            |```Game started/unhosted: ${gameInfo.name}```
-            """.trimMargin()
-
-        postInNotificationChannels(text)
+        for ((_, target) in notificationTargets) {
+            target.processGameRemove(gameInfo)
+        }
     }
 
     private fun handleBotLoad(event: ReadyEvent) {
         retrieveSettings()
 
-        watcher = Watcher(this)
+        watcher.start()
         log.info("Watcher started.")
     }
 

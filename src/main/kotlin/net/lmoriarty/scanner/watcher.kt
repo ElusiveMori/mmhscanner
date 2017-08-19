@@ -5,7 +5,11 @@ import kotlin.concurrent.timer
 /**
  * Holds info about a single MMH bot account, as much as is relevant to us.
  */
-data class GameInfo(var name: String, var updated: Boolean, var gameType: GameType, var oldName: String)
+data class GameInfo(var name: String,
+                    var updated: Boolean,
+                    var gameType: GameType,
+                    var oldName: String,
+                    var botName: String)
 
 enum class GameType(pattern: String) {
     ROTRP("""(rotrp)"""),
@@ -27,7 +31,7 @@ class Watcher(val bot: ChatBot) {
     // key is mmh bot account name
     private val registry: MutableMap<String, GameInfo> = HashMap()
 
-    init {
+    fun start() {
         timer(initialDelay = 5000, period = 5000, action = {scan()})
     }
 
@@ -74,7 +78,7 @@ class Watcher(val bot: ChatBot) {
 
                 // a new game has been hosted on the bot
                 if (info == null) {
-                    info = GameInfo(data.currentGame, false, gameType, "")
+                    info = GameInfo(data.currentGame, false, gameType, "", data.botName)
                     bot.onGameHosted(info)
                     registry[data.botName] = info
                 }
