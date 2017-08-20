@@ -283,6 +283,7 @@ class ChatBot {
             }
 
             executor = ThreadPoolExecutor(1, 1, 0L, TimeUnit.MILLISECONDS, LinkedBlockingQueue(), threadFactory)
+            executor.allowCoreThreadTimeOut(false)
 
             executor.submit {
                 bot.clearMessagesInChannel(channel)
