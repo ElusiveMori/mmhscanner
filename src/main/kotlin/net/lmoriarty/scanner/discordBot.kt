@@ -84,6 +84,11 @@ class ChatBot {
             Settings.channels[id] = channel
         }
 
+        val owner = this.owner
+        if (owner != null) {
+            Settings.owner = owner.longID
+        }
+
         Settings.writeSettings()
     }
 
