@@ -32,7 +32,7 @@ class Watcher(val bot: ChatBot) {
     private val registry: MutableMap<String, GameInfo> = HashMap()
 
     fun start() {
-        timer(initialDelay = 5000, period = 5000, action = {scan()})
+        timer(name = "Watcher", initialDelay = 5000, period = 5000, action = {scan()})
     }
 
     /**

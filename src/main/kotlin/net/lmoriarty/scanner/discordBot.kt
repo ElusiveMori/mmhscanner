@@ -43,14 +43,14 @@ class ChatBot {
         val internalThreadFactory = Executors.defaultThreadFactory()
         val listenerThreadFactory = ThreadFactory {
             val thread = internalThreadFactory.newThread(it)
-            thread.name = "MMH Scanner Handler Thread"
+            thread.name = "Handler Thread"
             thread.isDaemon = false
             return@ThreadFactory thread
         }
 
         val requestThreadFactory = ThreadFactory {
             val thread = internalThreadFactory.newThread(it)
-            thread.name = "MMH Scanner Request Thread"
+            thread.name = "Request Thread"
             thread.isDaemon = false
             return@ThreadFactory thread
         }
@@ -277,7 +277,7 @@ class ChatBot {
         init {
             val threadFactory = ThreadFactory {
                 val thread = Executors.defaultThreadFactory().newThread(it)
-                thread.name = "MMH Scanner Channel Update Thread (${channel.name})"
+                thread.name = "Channel Update Thread (${channel.name})"
                 thread.isDaemon = false
                 return@ThreadFactory thread
             }
@@ -343,6 +343,7 @@ class ChatBot {
             executor.submit {
                 watchedGames[info.botName] = info
                 updateInfoMessage()
+                log.info("Procedded game update: ${info.name}")
             }
         }
 
@@ -351,6 +352,7 @@ class ChatBot {
                 watchedGames[info.botName] = info
                 makeRequest { channel.sendMessage("@everyone A game has been hosted! `${info.name}`") }
                 updateInfoMessage()
+                log.info("Procedded game create: ${info.name}")
             }
         }
 
@@ -358,6 +360,7 @@ class ChatBot {
             executor.submit {
                 watchedGames.remove(info.botName)
                 updateInfoMessage()
+                log.info("Procedded game remove: ${info.name}")
             }
         }
 
