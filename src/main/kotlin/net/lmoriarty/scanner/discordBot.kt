@@ -344,6 +344,7 @@ class ChatBot {
         fun processGameCreate(info: GameInfo) {
             executor.submit {
                 watchedGames[info.botName] = info
+                makeRequest { channel.sendMessage("@everyone A game has been hosted! `${info.name}`") }
                 updateInfoMessage()
             }
         }
