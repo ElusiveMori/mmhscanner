@@ -301,7 +301,7 @@ class ChatBot {
                     log.info("Periodically updating info message.")
                     updateInfoMessage()
                     log.info("Periodically updated info message.")
-                }
+                }.get() // wait until we're finished to not spam the queue
             })
 
             log.info("NotificationTarget created for channel ${channel.name} in ${channel.guild.name}")
