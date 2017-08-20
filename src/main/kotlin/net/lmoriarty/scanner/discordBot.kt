@@ -286,13 +286,13 @@ class ChatBot {
 
             executor.submit {
                 bot.clearMessagesInChannel(channel)
-
-                for ((_, info) in bot.watcher.getAll()) {
-                    processGameCreate(info)
-                }
             }
 
-            updateTimer = timer(initialDelay = 10000, period = 10000, action = {
+            for ((_, info) in bot.watcher.getAll()) {
+                processGameCreate(info)
+            }
+
+            updateTimer = timer(initialDelay = 0, period = 1000, action = {
                 executor.submit{ updateInfoMessage() }
             })
 
