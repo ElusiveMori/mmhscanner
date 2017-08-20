@@ -20,6 +20,7 @@ fun <T> makeRequest(action: () -> T): T {
         try {
             return action()
         } catch (e: RateLimitException) {
+            log.info("Hit a rate limit - retrying in ${e.retryDelay / 1000} seconds.")
             Thread.sleep(e.retryDelay + 5)
         }
     }
@@ -311,14 +312,36 @@ class ChatBot {
 
             log.info("Updating info message.")
             if (lastMessage == null) {
-                makeRequest { this.lastMessage = channel.sendMessage(string) }
+                makeRequest {
+                    log.info("Trying to send new message.")
+                    this.lastMessage = channel.sendMessage(string)
+                    log.info("Sent new message.")
+                }
             } else {
-                val history = makeRequest { channel.getMessageHistory(32) }
+                val history = makeRequest {
+                    log.info("Trying to get history.")
+                    val history = channel.getMessageHistory(32)
+                    log.info("Got history.")
+                    history
+                }
                 if (history.latestMessage != lastMessage) {
-                    makeRequest { lastMessage.delete() }
-                    this.lastMessage = makeRequest { channel.sendMessage(string) }
+                    makeRequest {
+                        log.info("Trying to delete message.")
+                        lastMessage.delete()
+                        log.info("Deleted message.")
+                    }
+                    this.lastMessage = makeRequest {
+                        log.info("Trying to send new message.")
+                        val message = channel.sendMessage(string)
+                        log.info("Sent new message.")
+                        message
+                    }
                 } else {
-                    makeRequest { lastMessage.edit(string) }
+                    makeRequest {
+                        log.info("Trying to edit message.")
+                        lastMessage.edit(string)
+                        log.info("Edited message.")
+                    }
                 }
             }
             log.info("Updated info message.")
