@@ -286,15 +286,21 @@ class ChatBot {
             executor.allowCoreThreadTimeOut(false)
 
             executor.submit {
+                log.info("Clearing messages.")
                 bot.clearMessagesInChannel(channel)
+                log.info("Cleared messages.")
             }
 
             for ((_, info) in bot.watcher.getAll()) {
                 processGameCreate(info)
             }
 
-            updateTimer = timer(initialDelay = 0, period = 1000, action = {
-                executor.submit{ updateInfoMessage() }
+            updateTimer = timer(initialDelay = 1000, period = 1000, action = {
+                executor.submit{
+                    log.info("Periodically updating info message.")
+                    updateInfoMessage()
+                    log.info("Periodically updated info message.")
+                }
             })
 
             log.info("NotificationTarget created for channel ${channel.name} in ${channel.guild.name}")
@@ -303,6 +309,7 @@ class ChatBot {
         private fun sendInfoMessage(string: String) {
             val lastMessage = lastMessage
 
+            log.info("Updating info message.")
             if (lastMessage == null) {
                 makeRequest { this.lastMessage = channel.sendMessage(string) }
             } else {
@@ -314,6 +321,7 @@ class ChatBot {
                     makeRequest { lastMessage.edit(string) }
                 }
             }
+            log.info("Updated info message.")
         }
 
         private fun buildInfoMessage(): String {
@@ -342,26 +350,29 @@ class ChatBot {
 
         fun processGameUpdate(info: GameInfo) {
             executor.submit {
+                log.info("Processing game update: ${info.name}")
                 watchedGames[info.botName] = info
                 updateInfoMessage()
-                log.info("Procedded game update: ${info.name}")
+                log.info("Processed game update: ${info.name}")
             }
         }
 
         fun processGameCreate(info: GameInfo) {
             executor.submit {
+                log.info("Processing game create: ${info.name}")
                 watchedGames[info.botName] = info
                 makeRequest { channel.sendMessage("@everyone A game has been hosted! `${info.name}`") }
                 updateInfoMessage()
-                log.info("Procedded game create: ${info.name}")
+                log.info("Processed game create: ${info.name}")
             }
         }
 
         fun processGameRemove(info: GameInfo) {
             executor.submit {
+                log.info("Processing game remove: ${info.name}")
                 watchedGames.remove(info.botName)
                 updateInfoMessage()
-                log.info("Procedded game remove: ${info.name}")
+                log.info("Processed game remove: ${info.name}")
             }
         }
 
