@@ -292,7 +292,7 @@ class ChatBot {
                 }
             }
 
-            updateTimer = timer(initialDelay = 0, period = 1000, action = {
+            updateTimer = timer(initialDelay = 10000, period = 10000, action = {
                 executor.submit{ updateInfoMessage() }
             })
 
@@ -308,7 +308,7 @@ class ChatBot {
                 val history = makeRequest { channel.getMessageHistory(32) }
                 if (history.latestMessage != lastMessage) {
                     makeRequest { lastMessage.delete() }
-                    makeRequest { this.lastMessage = channel.sendMessage(string) }
+                    this.lastMessage = makeRequest { channel.sendMessage(string) }
                 } else {
                     makeRequest { lastMessage.edit(string) }
                 }
@@ -341,6 +341,7 @@ class ChatBot {
 
         fun processGameUpdate(info: GameInfo) {
             executor.submit {
+                watchedGames[info.botName] = info
                 updateInfoMessage()
             }
         }
