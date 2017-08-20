@@ -52,7 +52,7 @@ object Settings {
 
     fun writeSettings() {
         settingsFile.bufferedWriter().use {
-            gson.toJson(ChatBotSettings(token, channels), it)
+            gson.toJson(ChatBotSettings(token, channels, owner), it)
             log.info("Wrote settings:\n" + this)
         }
     }
