@@ -6,6 +6,7 @@ import sx.blah.discord.api.events.IListener
 import sx.blah.discord.handle.impl.events.ReadyEvent
 import sx.blah.discord.handle.impl.events.guild.channel.message.MessageReceivedEvent
 import sx.blah.discord.handle.obj.*
+import sx.blah.discord.util.DiscordException
 import sx.blah.discord.util.RateLimitException
 import java.util.*
 import java.util.concurrent.*
@@ -286,18 +287,20 @@ class ChatBot {
             executor = ThreadPoolExecutor(1, 1, 0L, TimeUnit.MILLISECONDS, LinkedBlockingQueue(), threadFactory)
             executor.allowCoreThreadTimeOut(false)
 
-            executor.submit {
-                bot.clearMessagesInChannel(channel)
-            }
-
             for ((_, info) in bot.watcher.getAll()) {
                 processGameCreate(info)
             }
 
             updateTimer = timer(initialDelay = 1000, period = 5000, action = {
-                executor.submit{
-                    updateInfoMessage()
-                }.get() // wait until we're finished to not spam the queue
+                try {
+                    executor.submit {
+                        updateInfoMessage()
+                    }.get() // wait until we're finished to not spam the queue
+                } catch (e: DiscordException) {
+                    log.warn("Discord Error: ", e)
+                } catch (e: Exception) {
+                    log.error("Generic Error: ", e)
+                }
             })
 
             log.info("NotificationTarget created for channel ${channel.name} in ${channel.guild.name}")
