@@ -287,9 +287,7 @@ class ChatBot {
             executor.allowCoreThreadTimeOut(false)
 
             executor.submit {
-                log.info("Clearing messages.")
                 bot.clearMessagesInChannel(channel)
-                log.info("Cleared messages.")
             }
 
             for ((_, info) in bot.watcher.getAll()) {
@@ -297,11 +295,8 @@ class ChatBot {
             }
 
             updateTimer = timer(initialDelay = 1000, period = 5000, action = {
-                log.info("Scheduled additional update.")
                 executor.submit{
-                    log.info("Periodically updating info message.")
                     updateInfoMessage()
-                    log.info("Periodically updated info message.")
                 }.get() // wait until we're finished to not spam the queue
             })
 
@@ -311,41 +306,27 @@ class ChatBot {
         private fun sendInfoMessage(string: String) {
             val lastMessage = lastMessage
 
-            log.info("Updating info message.")
             if (lastMessage == null) {
                 makeRequest {
-                    log.info("Trying to send new message.")
                     this.lastMessage = channel.sendMessage(string)
-                    log.info("Sent new message.")
                 }
             } else {
                 val history = makeRequest {
-                    log.info("Trying to get history.")
-                    val history = channel.getMessageHistory(32)
-                    log.info("Got history.")
-                    history
+                    channel.getMessageHistory(32)
                 }
                 if (history.latestMessage != lastMessage) {
                     makeRequest {
-                        log.info("Trying to delete message.")
                         lastMessage.delete()
-                        log.info("Deleted message.")
                     }
                     this.lastMessage = makeRequest {
-                        log.info("Trying to send new message.")
-                        val message = channel.sendMessage(string)
-                        log.info("Sent new message.")
-                        message
+                        channel.sendMessage(string)
                     }
                 } else {
                     makeRequest {
-                        log.info("Trying to edit message.")
                         lastMessage.edit(string)
-                        log.info("Edited message.")
                     }
                 }
             }
-            log.info("Updated info message.")
         }
 
         private fun buildInfoMessage(): String {
@@ -374,29 +355,20 @@ class ChatBot {
 
         fun processGameUpdate(info: GameInfo) {
             executor.submit {
-                log.info("Processing game update: ${info.name}")
                 watchedGames[info.botName] = info
-                updateInfoMessage()
-                log.info("Processed game update: ${info.name}")
             }
         }
 
         fun processGameCreate(info: GameInfo) {
             executor.submit {
-                log.info("Processing game create: ${info.name}")
                 watchedGames[info.botName] = info
                 makeRequest { channel.sendMessage("@everyone A game has been hosted! `${info.name}`") }
-                updateInfoMessage()
-                log.info("Processed game create: ${info.name}")
             }
         }
 
         fun processGameRemove(info: GameInfo) {
             executor.submit {
-                log.info("Processing game remove: ${info.name}")
                 watchedGames.remove(info.botName)
-                updateInfoMessage()
-                log.info("Processed game remove: ${info.name}")
             }
         }
 
