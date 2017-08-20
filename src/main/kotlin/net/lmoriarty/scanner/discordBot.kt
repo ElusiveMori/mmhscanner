@@ -22,7 +22,7 @@ fun <T> makeRequest(action: () -> T): T {
             return action()
         } catch (e: RateLimitException) {
             log.info("Hit a rate limit - retrying in ${e.retryDelay} milliseconds.")
-            Thread.sleep(e.retryDelay / 1000)
+            Thread.sleep(e.retryDelay)
         }
     }
 }
@@ -146,6 +146,26 @@ class ChatBot {
         log.info("Deleted ${toDelete.size} messages.")
     }
 
+    // debug command to see when we hit the rate limit
+    private fun commandStressTest(message: IMessage) {
+        val channel = message.channel
+        val user = message.author
+        val guild = message.guild
+
+        if (canUserManage(user, guild)) {
+
+            while (true) {
+                try {
+                    channel.sendMessage("Test! Test! Test! Test! Test! Test!")
+                }
+                catch (e: RateLimitException) {
+                    log.info("STRESS TEST RATE LIMIT: ${e.retryDelay}, ${e.method}")
+                    Thread.sleep(e.retryDelay)
+                }
+            }
+        }
+    }
+
     private fun commandListGameTypes(message: IMessage) {
         val channel = message.channel
 
@@ -202,11 +222,9 @@ class ChatBot {
         val channel = message.channel
 
         if (canUserManage(user, guild)) {
-            if (isNotifiableChannel(channel)) {
-                clearMessagesInChannel(channel)
+            clearMessagesInChannel(channel)
 
-                makeRequest { channel.sendMessage("I've cleared all my messages, Dave.") }
-            }
+            makeRequest { channel.sendMessage("I've cleared all my messages, Dave.") }
         }
     }
 
@@ -226,6 +244,7 @@ class ChatBot {
                 "unregister" -> commandUnregisterChannel(message)
                 "clear" -> commandClearMessages(message)
                 "list" -> commandListGameTypes(message)
+                "stress" -> commandStressTest(message)
             }
         }
     }
