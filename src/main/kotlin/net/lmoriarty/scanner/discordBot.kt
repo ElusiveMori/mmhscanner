@@ -296,7 +296,7 @@ class ChatBot {
                 processGameCreate(info)
             }
 
-            updateTimer = timer(initialDelay = 1000, period = 1000, action = {
+            updateTimer = timer(initialDelay = 1000, period = 5000, action = {
                 log.info("Scheduled additional update.")
                 executor.submit{
                     log.info("Periodically updating info message.")
