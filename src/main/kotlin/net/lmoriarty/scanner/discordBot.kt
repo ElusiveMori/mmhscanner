@@ -22,7 +22,7 @@ fun <T> makeRequest(action: () -> T): T {
             return action()
         } catch (e: RateLimitException) {
             log.info("Hit a rate limit - retrying in ${e.retryDelay} milliseconds.")
-            Thread.sleep(e.retryDelay + 5)
+            Thread.sleep(e.retryDelay / 1000)
         }
     }
 }
