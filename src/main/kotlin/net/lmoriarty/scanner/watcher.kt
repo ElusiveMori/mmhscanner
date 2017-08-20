@@ -9,7 +9,9 @@ data class GameInfo(var name: String,
                     var updated: Boolean,
                     var gameType: GameType,
                     var oldName: String,
-                    var botName: String)
+                    var botName: String,
+                    var playerCount: String,
+                    var oldPlayerCount: String)
 
 enum class GameType(pattern: String) {
     ROTRP("""(rotrp)"""),
@@ -62,10 +64,13 @@ class Watcher(val bot: ChatBot) {
                 // we already had a tracked game on this bot
                 if (info != null) {
                     if (info.gameType == gameType) {
-                        // update if name got changed
-                        if (info.name != data.currentGame) {
+                        // update if name and/or playercount got changed
+                        if (info.name != data.currentGame || info.playerCount != data.playerCount) {
                             info.oldName = info.name
+                            info.oldPlayerCount = info.playerCount
+
                             info.name = data.currentGame
+                            info.playerCount = data.playerCount
                             bot.onGameUpdated(info)
                         }
                     } else {
@@ -78,7 +83,7 @@ class Watcher(val bot: ChatBot) {
 
                 // a new game has been hosted on the bot
                 if (info == null) {
-                    info = GameInfo(data.currentGame, false, gameType, "", data.botName)
+                    info = GameInfo(data.currentGame, false, gameType, "", data.botName, data.playerCount, "")
                     bot.onGameHosted(info)
                     registry[data.botName] = info
                 }

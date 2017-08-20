@@ -151,26 +151,6 @@ class ChatBot {
         log.info("Deleted ${toDelete.size} messages.")
     }
 
-    // debug command to see when we hit the rate limit
-    private fun commandStressTest(message: IMessage) {
-        val channel = message.channel
-        val user = message.author
-        val guild = message.guild
-
-        if (canUserManage(user, guild)) {
-
-            while (true) {
-                try {
-                    channel.sendMessage("Test! Test! Test! Test! Test! Test!")
-                }
-                catch (e: RateLimitException) {
-                    log.info("STRESS TEST RATE LIMIT: ${e.retryDelay}, ${e.method}")
-                    Thread.sleep(e.retryDelay)
-                }
-            }
-        }
-    }
-
     private fun commandListGameTypes(message: IMessage) {
         val channel = message.channel
 
@@ -249,27 +229,26 @@ class ChatBot {
                 "unregister" -> commandUnregisterChannel(message)
                 "clear" -> commandClearMessages(message)
                 "list" -> commandListGameTypes(message)
-                "stress" -> commandStressTest(message)
             }
         }
     }
 
     fun onGameHosted(gameInfo: GameInfo) {
-        log.info("A game has been hosted: ${gameInfo.name}")
+        log.info("A game has been hosted: ${gameInfo.name} (${gameInfo.playerCount})")
         for ((_, target) in notificationTargets) {
             target.processGameCreate(gameInfo)
         }
     }
 
     fun onGameUpdated(gameInfo: GameInfo) {
-        log.info("A game has been updated: ${gameInfo.oldName} -> ${gameInfo.name}")
+        log.info("A game has been updated: ${gameInfo.oldName} (${gameInfo.oldPlayerCount}) -> (${gameInfo.playerCount}) ${gameInfo.name}")
         for ((_, target) in notificationTargets) {
             target.processGameUpdate(gameInfo)
         }
     }
 
     fun onGameRemoved(gameInfo: GameInfo) {
-        log.info("A game has been removed: ${gameInfo.name}")
+        log.info("A game has been removed: ${gameInfo.name} (${gameInfo.playerCount})")
         for ((_, target) in notificationTargets) {
             target.processGameRemove(gameInfo)
         }
@@ -366,7 +345,7 @@ class ChatBot {
                 }
 
                 for ((bot, info) in watchedGames) {
-                    message += "| ${bot + " ".repeat(longestBotName - bot.length)}  ---  ${info.name}\n"
+                    message += "| ${bot + " ".repeat(longestBotName - bot.length)}  --- (${info.playerCount}) ${info.name}\n"
                 }
 
                 message += "```"

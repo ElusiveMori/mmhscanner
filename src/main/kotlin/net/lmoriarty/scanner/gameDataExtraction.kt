@@ -13,7 +13,7 @@ enum class Realm {
 data class GameRow(val botName: String,
                    val realm: Realm = Realm.USA,
                    val currentGame: String = "",
-                   val ingameCounter: String = "")
+                   val playerCount: String = "")
 
 private val gameListUrl: String = "http://makemehost.com/refresh/divGames-table-mmh.php"
 private fun fetchDocument(): Document = Jsoup.connect(gameListUrl).get()
@@ -40,7 +40,7 @@ private fun extractRow(element: Element): GameRow {
                 botName = columns[0],
                 realm = Realm.valueOf(columns[1].toUpperCase()),
                 currentGame = columns[3],
-                ingameCounter = columns[4])
+                playerCount = columns[4])
     } catch (e: Exception) {
         if (e is DataExtractException) throw e
         throw DataExtractException("Unexpected parsing error", e)
