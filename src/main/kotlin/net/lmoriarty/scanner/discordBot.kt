@@ -297,6 +297,7 @@ class ChatBot {
             }
 
             updateTimer = timer(initialDelay = 1000, period = 1000, action = {
+                log.info("Scheduled additional update.")
                 executor.submit{
                     log.info("Periodically updating info message.")
                     updateInfoMessage()
