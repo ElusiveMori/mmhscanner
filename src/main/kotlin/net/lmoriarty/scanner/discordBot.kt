@@ -94,8 +94,7 @@ class ChatBot {
             val channel = client.getChannelByID(id)
             val target = NotificationTarget(channel, this, HashSet(notificationChannel.types))
             notificationTargets[id] = target
-            log.info("Retrieved notification target (${channel.name}, ${target.types}).")
-        }
+         }
 
         if (Settings.owner != 0L) {
             val user = client.getUserByID(Settings.owner)
@@ -230,18 +229,21 @@ class ChatBot {
     }
 
     fun onGameHosted(gameInfo: GameInfo) {
+        log.info("A game has been hosted: ${gameInfo.name}")
         for ((_, target) in notificationTargets) {
             target.processGameCreate(gameInfo)
         }
     }
 
     fun onGameUpdated(gameInfo: GameInfo) {
+        log.info("A game has been updated: ${gameInfo.oldName} -> ${gameInfo.name}")
         for ((_, target) in notificationTargets) {
             target.processGameUpdate(gameInfo)
         }
     }
 
     fun onGameRemoved(gameInfo: GameInfo) {
+        log.info("A game has been removed: ${gameInfo.name}")
         for ((_, target) in notificationTargets) {
             target.processGameRemove(gameInfo)
         }
@@ -290,9 +292,11 @@ class ChatBot {
                 }
             }
 
-            updateTimer = timer(initialDelay = 0, period = 10000, action = {
+            updateTimer = timer(initialDelay = 0, period = 1000, action = {
                 executor.submit{ updateInfoMessage() }
             })
+
+            log.info("NotificationTarget created for channel ${channel.name} in ${channel.guild.name}")
         }
 
         private fun sendInfoMessage(string: String) {
