@@ -11,9 +11,9 @@ private const val tokenPlaceholder = "PUT_TOKEN_HERE"
  * Stores settings as retrieved/written to the JSON file.
  */
 object Settings {
-    data class NotificationChannel(var types: MutableSet<GameType> = HashSet())
+    data class ChannelSettings(var types: MutableSet<GameType> = HashSet())
     data class ChatBotSettings(var token: String = tokenPlaceholder,
-                               var channels: MutableMap<Long, NotificationChannel> = HashMap(),
+                               var channels: MutableMap<Long, ChannelSettings> = HashMap(),
                                var owner: Long = 0)
 
     private val gson: Gson = GsonBuilder().setPrettyPrinting().create()
@@ -23,7 +23,7 @@ object Settings {
     var token: String
         get() = settings.token
         set(value) {settings.token = value}
-    var channels: MutableMap<Long, NotificationChannel>
+    var channels: MutableMap<Long, ChannelSettings>
         get() = settings.channels
         set(value) {settings.channels = value}
     var owner: Long
