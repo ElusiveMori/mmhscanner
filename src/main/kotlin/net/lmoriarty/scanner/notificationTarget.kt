@@ -17,7 +17,7 @@ class NotificationTarget(val channel: IChannel,
                          val types: MutableSet<GameType> = HashSet()) {
     private var lastMessage: IMessage? = null
     private val executor: ThreadPoolExecutor
-    private val notificationMessages = HashMap<GameInfo, IMessage>()
+    private val notificationMessages = HashMap<String, IMessage>()
     // use a treemap for strict ordering
     private val watchedGames = TreeMap<String, GameInfo>()
     private val updateTimer: Timer
@@ -140,15 +140,15 @@ class NotificationTarget(val channel: IChannel,
             watchedGames[info.botName] = info
 
             val message = makeRequest { channel.sendMessage("@here A game has been hosted! `${info.name}`") }
-            notificationMessages[info] = message
+            notificationMessages[info.botName] = message
         }
     }
 
     fun processGameRemove(info: GameInfo) {
         executor.submit {
             watchedGames.remove(info.botName)
-            makeRequest { notificationMessages[info]?.delete() }
-            notificationMessages.remove(info)
+            makeRequest { notificationMessages[info.botName]?.delete() }
+            notificationMessages.remove(info.botName)
         }
     }
 
