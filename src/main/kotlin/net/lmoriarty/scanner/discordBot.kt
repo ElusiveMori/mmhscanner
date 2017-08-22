@@ -23,9 +23,7 @@ fun <T> makeRequest(action: () -> T): T {
     }
 }
 
-val messageHeader = """
-|```Type "-mmh list" to see which game types are available!```
-""".trimMargin()
+
 
 class ChatBot {
     val watcher: Watcher
@@ -115,10 +113,12 @@ class ChatBot {
         return permissions.contains(Permissions.ADMINISTRATOR) || permissions.contains(Permissions.MANAGE_SERVER)
     }
 
-    private fun commandListGameTypes(message: IMessage) {
+    private fun commandListGameTypes(message: IMessage, arg: String) {
         val channel = message.channel
+        val user = message.author
+        val guild = message.guild
 
-        if (isNotifiableChannel(channel)) {
+        if (canUserManage(user, guild) && isNotifiableChannel(channel)) {
             var response = "Here's the supported game types, Dave:\n```"
 
             for (gameType in GameType.values()) {
@@ -131,41 +131,80 @@ class ChatBot {
         }
     }
 
-    private fun commandRegisterChannel(message: IMessage) {
+    private fun commandRegisterChannel(message: IMessage, arg: String) {
         val user = message.author
         val guild = message.guild
         val channel = message.channel
+        val typesStr = arg.split(" ")
 
         if (canUserManage(user, guild)) {
-            if (!isNotifiableChannel(channel)) {
-                notificationTargets[channel] = NotificationTarget(channel, this, HashSet())
-                commitSettings()
+            val types = HashSet<GameType>()
 
-                makeRequest { channel.sendMessage("Channel registered for notifications, Dave.") }
+            if (arg == "all") {
+                types.addAll(GameType.values())
             } else {
-                makeRequest { channel.sendMessage("I can't do that, Dave.") }
+                for (typeStr in typesStr) {
+                    try {
+                        val type = GameType.valueOf(typeStr.toUpperCase())
+                        types.add(type)
+                    } catch (e: IllegalArgumentException) {
+                        makeRequest { channel.sendMessage("'$typeStr' is not a real game type, Dave.") }
+                    }
+                }
             }
+
+            var target = notificationTargets[channel]
+            if (target == null) {
+                target = NotificationTarget(channel, this, HashSet())
+                notificationTargets[channel] = target
+            }
+
+            target.addGameTypes(types)
+
+            makeRequest { channel.sendMessage("Channel registered for '$types' notifications, Dave.") }
+            commitSettings()
         }
     }
 
-    private fun commandUnregisterChannel(message: IMessage) {
+    private fun commandUnregisterChannel(message: IMessage, arg: String) {
         val user = message.author
         val guild = message.guild
         val channel = message.channel
+        val typesStr = arg.split(" ")
 
         if (canUserManage(user, guild)) {
             if (isNotifiableChannel(channel)) {
-                notificationTargets.remove(channel)?.kill()
-                commitSettings()
+                val types = HashSet<GameType>()
 
-                makeRequest { channel.sendMessage("Channel unregistered for notifications, Dave.") }
-            } else {
-                makeRequest { channel.sendMessage("I can't do that, Dave.") }
+                if (arg == "all") {
+                    types.addAll(GameType.values())
+                } else {
+                    for (typeStr in typesStr) {
+                        try {
+                            val type = GameType.valueOf(typeStr.toUpperCase())
+                            types.add(type)
+                        } catch (e: IllegalArgumentException) {
+                            makeRequest { channel.sendMessage("'$typeStr' is not a real game type, Dave.") }
+                        }
+                    }
+                }
+
+                val target = notificationTargets[channel] as NotificationTarget
+
+                target.removeGameTypes(types)
+
+                if (target.isEmpty()) {
+                    notificationTargets.remove(channel)
+                    target.shutdown()
+                }
+
+                makeRequest { channel.sendMessage("Channel unregistered for '$types' notifications, Dave.") }
+                commitSettings()
             }
         }
     }
 
-    private fun commandClearMessages(message: IMessage) {
+    private fun commandClearMessages(message: IMessage, arg: String) {
         val user = message.author
         val guild = message.guild
         val channel = message.channel
@@ -190,13 +229,13 @@ class ChatBot {
 
         if (split[0] == "-mmh") {
             val command = split[1]
-            //val arg = if (split.size > 2) split.subList(2, split.size).reduce { acc, s -> acc + " " + s } else ""
+            val arg = if (split.size > 2) split.subList(2, split.size).reduce { acc, s -> acc + " " + s } else ""
 
             when (command) {
-                "register" -> commandRegisterChannel(message)
-                "unregister" -> commandUnregisterChannel(message)
-                "clear" -> commandClearMessages(message)
-                "list" -> commandListGameTypes(message)
+                "register" -> commandRegisterChannel(message, arg)
+                "unregister" -> commandUnregisterChannel(message, arg)
+                "clear" -> commandClearMessages(message, arg)
+                "list" -> commandListGameTypes(message, arg)
             }
         }
     }
@@ -204,7 +243,7 @@ class ChatBot {
     fun onGameHosted(gameInfo: GameInfo) {
         log.info("A game has been hosted: ${gameInfo.name} (${gameInfo.playerCount})")
         for ((_, target) in notificationTargets) {
-            target.processGameCreate(gameInfo)
+            target.processGameUpdate(gameInfo)
         }
     }
 

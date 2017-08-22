@@ -105,7 +105,7 @@ class Watcher(val bot: ChatBot) {
             // it's not critical if MMH goes down
             log.warn("MMH Connection Warning:", e)
         } catch (e: Exception) {
-            // don't let the exception propagate, because it will kill the timer
+            // don't let the exception propagate, because it will shutdown the timer
             log.error("Generic Error:", e)
         }
     }
