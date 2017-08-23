@@ -21,10 +21,13 @@ enum class GameType(pattern: String) {
     GCG("""(gcg|guilty crown)"""),
     TL("""(\bkot\b|titans land|titan land|\btl\b)"""),
     LOAD("""(\bload\b|life of a dragon)"""),
-    RP("""(roleplay|\brp\b)""");
+    RP("""(roleplay|\brp\b)"""),
+    MZI("""(mzi|medieval zombie invasion|medieval zombie|riverlands|winterscape|cityscape)""");
 
     val regex = Regex(pattern)
 }
+
+val ignoreRegex = Regex("""(\bpl\b|\bru\b|\bfr\b|\brus\b|\bger\b)""")
 
 /**
  * Scans the MMH roster and notifies the discord bot when it should post notifications.
@@ -42,6 +45,10 @@ class Watcher(val bot: ChatBot) {
      * or null otherwise
      */
     private fun shouldWatch(row: GameRow): GameType? {
+        if (row.currentGame.contains(ignoreRegex)) {
+            return null
+        }
+
         for (gameType in GameType.values()) {
             if (gameType.regex.containsMatchIn(row.currentGame.toLowerCase())) {
                 return gameType

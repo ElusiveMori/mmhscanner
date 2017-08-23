@@ -1,5 +1,6 @@
 package net.lmoriarty.scanner
 
+import sx.blah.discord.handle.impl.obj.Channel
 import sx.blah.discord.handle.obj.IChannel
 import sx.blah.discord.handle.obj.IMessage
 import sx.blah.discord.util.DiscordException
@@ -60,6 +61,7 @@ class NotificationTarget(val channel: IChannel,
         if (lastMessage == null) {
             makeRequest { this.lastMessage = channel.sendMessage(string) }
         } else {
+            (channel as Channel).messages.clear() // we want to re-fetch history, so clear the cache
             val history = makeRequest { channel.getMessageHistory(8) }
             if (history.latestMessage != lastMessage) {
                 makeRequest { lastMessage.delete() }
