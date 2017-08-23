@@ -69,25 +69,48 @@ private fun extractEntRow(element: Element): GameRow {
     }
 }
 
+// dirty hack because the ent list is unreliable as fuck
+// and returns an empty list half of the time, even if games are hosted
+val entCache = ArrayList<GameRow>()
+var timeout = 0L
 fun extractRows(): List<GameRow> {
     try {
         val htmlMmhRows = fetchDocument(mmhGameListUrl).getElementsByTag("tr")
         val htmlEntRows = fetchDocument(entGameListUrl).getElementsByTag("tr")
 
-        val gameRows = ArrayList<GameRow>()
+        val mmhRows = ArrayList<GameRow>()
+        val entRows = ArrayList<GameRow>()
 
         // remove first row because that is the header
         htmlMmhRows.removeAt(0)
         for (row in htmlMmhRows) {
-            gameRows.add(extractMmhRow(row))
+            mmhRows.add(extractMmhRow(row))
         }
 
         htmlEntRows.removeAt(0)
-        for (row in htmlEntRows) {
-            gameRows.add(extractEntRow(row))
+        if (htmlEntRows.size > 0) {
+            for (row in htmlEntRows) {
+                entRows.add(extractEntRow(row))
+            }
+
+            // cache the last non-empty result from ENT
+            entCache.clear()
+            entCache.addAll(entRows)
+            // set the timeout 60 seconds into the future
+            timeout = System.currentTimeMillis() + 1000 * 60
+        } else {
+            // return the cached result if the last non-empty result
+            // has been acquired less than 60 seconds ago
+            // otherwise, we can assume that the ent list is REALLY empty
+            if (timeout > System.currentTimeMillis()) {
+                entRows.addAll(entCache)
+            }
         }
 
-        return gameRows
+        val result = ArrayList<GameRow>()
+        result.addAll(entRows)
+        result.addAll(mmhRows)
+        return result
     } catch (e: IOException) {
         throw MakeMeHostConnectException("Failed to fetch data from MMH.", e)
     }
