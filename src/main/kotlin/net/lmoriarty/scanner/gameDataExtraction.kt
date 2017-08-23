@@ -7,7 +7,8 @@ import java.io.IOException
 
 enum class Realm {
     USA,
-    EUROPE
+    EUROPE,
+    UNKNOWN
 }
 
 data class GameRow(val botName: String,
@@ -15,8 +16,10 @@ data class GameRow(val botName: String,
                    val currentGame: String = "",
                    val playerCount: String = "")
 
-private val gameListUrl: String = "http://makemehost.com/refresh/divGames-table-mmh.php"
-private fun fetchDocument(): Document = Jsoup.connect(gameListUrl).get()
+private val mmhGameListUrl: String = "http://makemehost.com/refresh/divGames-table-mmh.php"
+private val entGameListUrl: String = "http://makemehost.com/refresh/divGames-table-ent.php"
+
+private fun fetchDocument(url: String): Document = Jsoup.connect(url).get()
 
 private fun getRowColumns(element: Element): List<String> {
     val columns = ArrayList<String>()
@@ -28,7 +31,7 @@ private fun getRowColumns(element: Element): List<String> {
     return columns
 }
 
-private fun extractRow(element: Element): GameRow {
+private fun extractMmhRow(element: Element): GameRow {
     try {
         val columns = getRowColumns(element)
 
@@ -47,15 +50,41 @@ private fun extractRow(element: Element): GameRow {
     }
 }
 
+private fun extractEntRow(element: Element): GameRow {
+    try {
+        val columns = getRowColumns(element)
+
+        if (columns.size < 3) {
+            throw DataExtractException("Not enough columns in table!")
+        }
+
+        return GameRow(
+                botName = columns[0],
+                currentGame = columns[1],
+                playerCount = columns[2],
+                realm = Realm.UNKNOWN)
+    } catch (e: Exception) {
+        if (e is DataExtractException) throw e
+        throw DataExtractException("Unexpected parsing error", e)
+    }
+}
+
 fun extractRows(): List<GameRow> {
     try {
-        val htmlRows = fetchDocument().getElementsByTag("tr")
+        val htmlMmhRows = fetchDocument(mmhGameListUrl).getElementsByTag("tr")
+        val htmlEntRows = fetchDocument(entGameListUrl).getElementsByTag("tr")
+
         val gameRows = ArrayList<GameRow>()
 
         // remove first row because that is the header
-        htmlRows.removeAt(0)
-        for (row in htmlRows) {
-            gameRows.add(extractRow(row))
+        htmlMmhRows.removeAt(0)
+        for (row in htmlMmhRows) {
+            gameRows.add(extractMmhRow(row))
+        }
+
+        htmlEntRows.removeAt(0)
+        for (row in htmlEntRows) {
+            gameRows.add(extractEntRow(row))
         }
 
         return gameRows
