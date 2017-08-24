@@ -104,7 +104,7 @@ class NotificationTarget(val channel: IChannel,
             message = "No games hosted right now."
         }
 
-        return message
+        return message + (if (fallback) "```" else "")
     }
 
     private fun buildInfoEmbed(): EmbedObject {
