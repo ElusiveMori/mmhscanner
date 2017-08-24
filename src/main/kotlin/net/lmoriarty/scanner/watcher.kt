@@ -21,8 +21,9 @@ enum class GameType(pattern: String) {
     GCG("""(gcg|guilty crown)"""),
     TL("""(\bkot\b|titans land|titan land|\btl\b)"""),
     LOAD("""(\bload\b|life of a dragon)"""),
-    RP("""(roleplay|\brp\b)"""),
-    MZI("""(mzi|medieval zombie invasion|medieval zombie|riverlands|winterscape|cityscape)""");
+    MZI("""(mzi|medieval zombie invasion|medieval zombie|riverlands|winterscape|cityscape)"""),
+    ROTK("""(rotk|three kingdoms)"""),
+    RP("""(roleplay|\brp\b)""");
 
     val regex = Regex(pattern)
 }
