@@ -77,13 +77,13 @@ class NotificationTarget(val channel: IChannel,
     }
 
     private fun buildHeaderString(fallback: Boolean = false): String {
-        var message = if (fallback) "```" else ""  + """Currently active game types: """ + if (fallback) "\n" else ""
+        var message = (if (fallback) "```" else "") + """Currently active game types: """ + (if (fallback) "\n" else "")
         message += types.map { it.toString() }.reduce {acc, s -> acc + ", " + s}
-        return message + if (fallback) "```" else ""
+        return message + (if (fallback) "```" else "")
     }
 
     private fun buildGameListString(fallback: Boolean = false): String {
-        if (fallback and watchedGames.isEmpty()) {
+        if (fallback && watchedGames.isEmpty()) {
             return "```No games hosted right now.```"
         }
 
