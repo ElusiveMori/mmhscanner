@@ -95,9 +95,9 @@ class NotificationTarget(val channel: IChannel,
         }
 
         for ((bot, info) in watchedGames) {
-            message += if (fallback) "| " else "`" +
+            message += (if (fallback) "| " else "`") +
                     "${bot + " ".repeat(longestBotName - bot.length)} --- (${info.playerCount}) ${info.name}" +
-                    if (fallback) "\n" else "`\n"
+                    (if (fallback) "\n" else "`\n")
         }
 
         if (message.isEmpty()) {
