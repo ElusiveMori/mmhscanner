@@ -1,9 +1,12 @@
 package net.lmoriarty.scanner
 
+import sx.blah.discord.api.internal.json.objects.EmbedObject
 import sx.blah.discord.handle.impl.obj.Channel
 import sx.blah.discord.handle.obj.IChannel
 import sx.blah.discord.handle.obj.IMessage
 import sx.blah.discord.util.DiscordException
+import sx.blah.discord.util.EmbedBuilder
+import java.awt.Color
 import java.util.*
 import java.util.concurrent.*
 import kotlin.concurrent.timer
@@ -55,32 +58,31 @@ class NotificationTarget(val channel: IChannel,
         log.info("NotificationTarget created for channel ${channel.name} in ${channel.guild.name}")
     }
 
-    private fun sendInfoMessage(string: String) {
+    private fun sendInfoMessage(embed: EmbedObject) {
         val lastMessage = lastMessage
 
         if (lastMessage == null) {
-            makeRequest { this.lastMessage = channel.sendMessage(string) }
+            makeRequest { this.lastMessage = channel.sendMessage(embed) }
         } else {
             (channel as Channel).messages.clear() // we want to re-fetch history, so clear the cache
             val history = makeRequest { channel.getMessageHistory(8) }
             if (history.latestMessage != lastMessage) {
                 makeRequest { lastMessage.delete() }
-                this.lastMessage = makeRequest { channel.sendMessage(string) }
+                this.lastMessage = makeRequest { channel.sendMessage(embed) }
             } else {
-                makeRequest { lastMessage.edit(string) }
+                makeRequest { lastMessage.edit(embed) }
             }
         }
     }
 
     private fun buildHeaderString(): String {
-        var message = """```Type "-mmh list" to see which game types are available!
-        |Currently active game types: """.trimMargin()
+        var message = """Currently active game types: """.trimMargin()
         message += types.map { it.toString() }.reduce {acc, s -> acc + ", " + s}
-        return message + "```"
+        return message
     }
 
     private fun buildGameListString(): String {
-        var message = "```Currently hosted games:\n|\n"
+        var message = ""
         var longestBotName = 0
 
         for ((bot, _) in watchedGames) {
@@ -88,18 +90,31 @@ class NotificationTarget(val channel: IChannel,
         }
 
         for ((bot, info) in watchedGames) {
-            message += "| ${bot + " ".repeat(longestBotName - bot.length)}  --- (${info.playerCount}) ${info.name}\n"
+            message += "`${bot + " ".repeat(longestBotName - bot.length)} --- (${info.playerCount}) ${info.name}`\n"
         }
 
-        return message + "```"
+        if (message.isEmpty()) {
+            message = "No games hosted right now."
+        }
+
+        return message
     }
 
-    private fun buildInfoMessage(): String {
-        if (watchedGames.size > 0) {
-            return buildHeaderString() + buildGameListString()
-        } else {
-            return buildHeaderString() + "```There are currently no hosted games.```"
+    private fun buildInfoMessage(): EmbedObject {
+        val builder = EmbedBuilder()
+        builder.withTitle("MMH Scanner")
+        builder.withColor(Color(255, 188, 78))
+        builder.withDescription(buildHeaderString())
+        val owner = bot.owner
+
+        if (owner != null) {
+            builder.withFooterText("Made by ${owner.name}#${owner.discriminator}")
+            builder.withFooterIcon(owner.avatarURL)
         }
+
+        builder.appendField("Game List:", buildGameListString(), false)
+
+        return builder.build()
     }
 
     private fun updateInfoMessage() {

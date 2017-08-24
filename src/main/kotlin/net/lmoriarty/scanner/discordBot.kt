@@ -30,7 +30,8 @@ class ChatBot {
     val client: IDiscordClient
 
     private val notificationTargets = ConcurrentHashMap<IChannel, NotificationTarget>()
-    private var owner: IUser? = null
+    var owner: IUser? = null
+        private set
 
     init {
         val internalThreadFactory = Executors.defaultThreadFactory()
