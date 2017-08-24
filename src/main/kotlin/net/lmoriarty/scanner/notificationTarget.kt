@@ -4,6 +4,7 @@ import sx.blah.discord.api.internal.json.objects.EmbedObject
 import sx.blah.discord.handle.impl.obj.Channel
 import sx.blah.discord.handle.obj.IChannel
 import sx.blah.discord.handle.obj.IMessage
+import sx.blah.discord.handle.obj.Permissions
 import sx.blah.discord.util.DiscordException
 import sx.blah.discord.util.EmbedBuilder
 import java.awt.Color
@@ -58,31 +59,35 @@ class NotificationTarget(val channel: IChannel,
         log.info("NotificationTarget created for channel ${channel.name} in ${channel.guild.name}")
     }
 
-    private fun sendInfoMessage(embed: EmbedObject) {
+    private fun sendInfoMessage(string: String, embed: EmbedObject?) {
         val lastMessage = lastMessage
 
         if (lastMessage == null) {
-            makeRequest { this.lastMessage = channel.sendMessage(embed) }
+            makeRequest { this.lastMessage = channel.sendMessage(string, embed) }
         } else {
             (channel as Channel).messages.clear() // we want to re-fetch history, so clear the cache
             val history = makeRequest { channel.getMessageHistory(8) }
             if (history.latestMessage != lastMessage) {
                 makeRequest { lastMessage.delete() }
-                this.lastMessage = makeRequest { channel.sendMessage(embed) }
+                this.lastMessage = makeRequest { channel.sendMessage(string, embed) }
             } else {
-                makeRequest { lastMessage.edit(embed) }
+                makeRequest { lastMessage.edit(string, embed) }
             }
         }
     }
 
-    private fun buildHeaderString(): String {
-        var message = """Currently active game types: """.trimMargin()
+    private fun buildHeaderString(fallback: Boolean = false): String {
+        var message = if (fallback) "```" else ""  + """Currently active game types: """ + if (fallback) "\n" else ""
         message += types.map { it.toString() }.reduce {acc, s -> acc + ", " + s}
-        return message
+        return message + if (fallback) "```" else ""
     }
 
-    private fun buildGameListString(): String {
-        var message = ""
+    private fun buildGameListString(fallback: Boolean = false): String {
+        if (fallback and watchedGames.isEmpty()) {
+            return "```No games hosted right now.```"
+        }
+
+        var message = if (fallback) "```Currently hosted games:\n" else ""
         var longestBotName = 0
 
         for ((bot, _) in watchedGames) {
@@ -90,7 +95,9 @@ class NotificationTarget(val channel: IChannel,
         }
 
         for ((bot, info) in watchedGames) {
-            message += "`${bot + " ".repeat(longestBotName - bot.length)} --- (${info.playerCount}) ${info.name}`\n"
+            message += if (fallback) "| " else "`" +
+                    "${bot + " ".repeat(longestBotName - bot.length)} --- (${info.playerCount}) ${info.name}" +
+                    if (fallback) "\n" else "`\n"
         }
 
         if (message.isEmpty()) {
@@ -100,10 +107,14 @@ class NotificationTarget(val channel: IChannel,
         return message
     }
 
-    private fun buildInfoMessage(): EmbedObject {
+    private fun buildInfoEmbed(): EmbedObject {
         val builder = EmbedBuilder()
         builder.withTitle("MMH Scanner")
-        builder.withColor(Color(255, 188, 78))
+        if (watchedGames.size > 0) {
+            builder.withColor(Color(0x45FA8B))
+        } else {
+            builder.withColor(Color(0xFFD1B2))
+        }
         builder.withDescription(buildHeaderString())
         val owner = bot.owner
 
@@ -117,8 +128,17 @@ class NotificationTarget(val channel: IChannel,
         return builder.build()
     }
 
+    private fun buildInfoString(): String {
+        return buildHeaderString(true) + buildGameListString(true)
+    }
+
     private fun updateInfoMessage() {
-        sendInfoMessage(buildInfoMessage())
+        if (bot.client.ourUser.getPermissionsForGuild(channel.guild).contains(Permissions.EMBED_LINKS)) {
+            sendInfoMessage("", buildInfoEmbed())
+        } else {
+            // fall back in case we can't send embeds
+            sendInfoMessage(buildInfoString(), null)
+        }
     }
 
     /**
