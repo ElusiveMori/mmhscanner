@@ -46,7 +46,7 @@ class Watcher(val bot: ChatBot) {
      * or null otherwise
      */
     private fun shouldWatch(row: GameRow): GameType? {
-        if (row.currentGame.toLoweCase().contains(ignoreRegex)) {
+        if (row.currentGame.toLowerCase().contains(ignoreRegex)) {
             return null
         }
 
