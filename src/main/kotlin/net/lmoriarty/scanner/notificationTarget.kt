@@ -96,12 +96,41 @@ class NotificationTarget(val channel: IChannel,
         return buildHeaderStringFallback() + buildGameListStringFallback()
     }
 
-    private fun sendInfoMessage() {
-
-        if (bot.canEmbedInChannel(channel)) {
-            infoMessageHolder.update(null, buildInfoEmbed())
+    private fun updateMessage() {
+        if (bot.canUseChannel(channel)) {
+            if (bot.canEmbedInChannel(channel)) {
+                infoMessageHolder.update(null, buildInfoEmbed())
+            } else {
+                infoMessageHolder.update(buildInfoString(), null)
+            }
         } else {
-            infoMessageHolder.update(buildInfoString(), null)
+            log.warn("Missing permissions to update info message in ${channel.name} from ${channel.guild.name}")
+        }
+    }
+
+    private fun renewMessage() {
+        if (bot.canUseChannel(channel) && bot.canDeleteInChannel(channel)) {
+            infoMessageHolder.renew()
+        } else {
+            log.warn("Missing permissions to renew info message in ${channel.name} from ${channel.guild.name}")
+        }
+    }
+
+    private fun sendNotification(info: GameInfo) {
+        if (bot.canUseChannel(channel)) {
+            if (notificationMessagesHolder.sendNotification(info)) {
+                renewInfoMessage()
+            }
+        } else {
+            log.warn("Missing permissions to post notifications in ${channel.name} from ${channel.guild.name}")
+        }
+    }
+
+    private fun removeNotification(info: GameInfo) {
+        if (bot.canDeleteInChannel(channel)) {
+            notificationMessagesHolder.removeNotification(info)
+        } else {
+            log.warn("Missing permissions to remove notifications in ${channel.name} from ${channel.guild.name}")
         }
     }
 
@@ -138,25 +167,15 @@ class NotificationTarget(val channel: IChannel,
     }
 
     private fun updateGame(info: GameInfo) {
-        if (bot.canUseChannel(channel)) {
-            notificationMessagesHolder.sendNotification(info)
-        } else {
-            log.warn("Missing permissions to post notifications in ${channel.name} from ${channel.guild.name}")
-        }
-
-        sendInfoMessage()
         watchedGames[info.botName] = info
+        sendNotification(info)
+        updateMessage()
     }
 
     private fun removeGame(info: GameInfo) {
-        if (bot.canDeleteInChannel(channel)) {
-            notificationMessagesHolder.removeNotification(info)
-        } else {
-            log.warn("Missing permissions to remove notifications in ${channel.name} from ${channel.guild.name}")
-        }
-
-        sendInfoMessage()
         watchedGames.remove(info.botName)
+        removeNotification(info)
+        updateMessage()
     }
 
     /**
@@ -188,26 +207,16 @@ class NotificationTarget(val channel: IChannel,
      */
     fun renewInfoMessage() {
         synchronized(this) {
-            if (!bot.canUseChannel(channel)) {
-                log.warn("Missing permissions to renew info message in ${channel.name} from ${channel.guild.name}")
-                return
-            }
-
-            infoMessageHolder.renew()
+            renewMessage()
         }
     }
 
     /**
-     * Updates the info message..
+     * Updates the info message.
      */
     fun updateInfoMessage() {
         synchronized(this) {
-            if (!bot.canUseChannel(channel)) {
-                log.warn("Missing permissions to update info message in ${channel.name} from ${channel.guild.name}")
-                return
-            }
-
-            sendInfoMessage()
+            updateMessage()
         }
     }
 
@@ -231,6 +240,9 @@ class NotificationTarget(val channel: IChannel,
         }
     }
 
+    /**
+     * Checks if the target isn't registered for any notifications.
+     */
     fun isEmpty(): Boolean {
         synchronized(this) {
             return types.isEmpty()
