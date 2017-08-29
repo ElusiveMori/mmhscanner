@@ -6,6 +6,7 @@ import sx.blah.discord.api.events.IListener
 import sx.blah.discord.handle.impl.events.ReadyEvent
 import sx.blah.discord.handle.impl.events.guild.channel.message.MessageReceivedEvent
 import sx.blah.discord.handle.obj.*
+import sx.blah.discord.util.PermissionUtils
 import sx.blah.discord.util.RateLimitException
 import java.util.*
 import java.util.concurrent.*
@@ -23,13 +24,12 @@ fun <T> makeRequest(action: () -> T): T {
     }
 }
 
-
-
 class ChatBot {
     val watcher: Watcher
     val client: IDiscordClient
 
-    private val notificationTargets = ConcurrentHashMap<IChannel, NotificationTarget>()
+    private val notificationTargets = HashMap<IChannel, NotificationTarget>()
+    private val targetExecutor: ExecutorService
     var owner: IUser? = null
         private set
 
@@ -52,6 +52,7 @@ class ChatBot {
         // we're going to be blocking in our handlers, so to avoid thread starving
         // we use an unbounded thread pool
         val executor = ThreadPoolExecutor(8, Int.MAX_VALUE, 60, TimeUnit.SECONDS, LinkedBlockingQueue(), listenerThreadFactory)
+        targetExecutor = ThreadPoolExecutor(8, Int.MAX_VALUE, 60, TimeUnit.SECONDS, LinkedBlockingQueue(), requestThreadFactory)
 
         val clientBuilder = ClientBuilder()
         clientBuilder.withToken(Settings.token)
@@ -65,6 +66,62 @@ class ChatBot {
         })
 
         watcher = Watcher(this)
+    }
+
+    private fun createNotificationTarget(channel: IChannel, types: Set<GameType>): NotificationTarget {
+        if (types.isEmpty()) throw IllegalArgumentException("Cannot create notification target with empty set.")
+
+        val target = NotificationTarget(channel, this, types)
+
+        targetExecutor.submit {
+            target.clearUntrackedMessages()
+
+            for ((_, info) in watcher.getAll()) {
+                target.processGameUpdate(info)
+            }
+
+            target.updateInfoMessage()
+        }
+
+        notificationTargets[channel] = target
+        return target
+    }
+
+    private fun addGameTypesToChannel(channel: IChannel, types: Set<GameType>) {
+        if (types.isEmpty()) return
+
+        val target = notificationTargets[channel]
+
+        if (target == null) {
+            createNotificationTarget(channel, types)
+        } else {
+            target.addGameTypes(types)
+
+            for ((_, info) in watcher.getAll()) {
+                target.processGameUpdate(info)
+            }
+        }
+    }
+
+    private fun removeGameTypesFromChannel(channel: IChannel, types: Set<GameType>) {
+        if (types.isEmpty()) return
+
+        val target = notificationTargets[channel]
+
+        if (target != null) {
+            for ((_, info) in watcher.getAll()) {
+                if (info.gameType in types) {
+                    target.processGameRemove(info)
+                }
+            }
+
+            target.removeGameTypes(types)
+
+            if (target.isEmpty()) {
+                target.shutdown()
+                notificationTargets.remove(channel)
+            }
+        }
     }
 
     private fun commitSettings() {
@@ -88,16 +145,15 @@ class ChatBot {
         notificationTargets.clear()
         owner = null
 
-        for ((id, notificationChannel) in Settings.channels) {
-            val channel = client.getChannelByID(id)
-            val target = NotificationTarget(channel, this, HashSet(notificationChannel.types))
-            notificationTargets[channel] = target
-         }
-
         if (Settings.owner != 0L) {
             val user = client.getUserByID(Settings.owner)
             owner = user
             log.info("Retrieved owner (${user.name}).")
+        }
+
+        for ((id, notificationChannel) in Settings.channels) {
+            val channel = client.getChannelByID(id)
+            createNotificationTarget(channel, notificationChannel.types)
         }
     }
 
@@ -154,13 +210,7 @@ class ChatBot {
                 }
             }
 
-            var target = notificationTargets[channel]
-            if (target == null) {
-                target = NotificationTarget(channel, this, HashSet())
-                notificationTargets[channel] = target
-            }
-
-            target.addGameTypes(types)
+            addGameTypesToChannel(channel, types)
 
             makeRequest { channel.sendMessage("Channel registered for '$types' notifications, Dave.") }
             commitSettings()
@@ -190,14 +240,7 @@ class ChatBot {
                     }
                 }
 
-                val target = notificationTargets[channel] as NotificationTarget
-
-                target.removeGameTypes(types)
-
-                if (target.isEmpty()) {
-                    notificationTargets.remove(channel)
-                    target.shutdown()
-                }
+                removeGameTypesFromChannel(channel, types)
 
                 makeRequest { channel.sendMessage("Channel unregistered for '$types' notifications, Dave.") }
                 commitSettings()
@@ -241,35 +284,65 @@ class ChatBot {
         }
     }
 
+    private fun hasPermissionInChannel(channel: IChannel, permission: Permissions): Boolean {
+        return PermissionUtils.hasPermissions(channel, client.ourUser, permission)
+    }
+
+    fun canEmbedInChannel(channel: IChannel): Boolean {
+        return hasPermissionInChannel(channel, Permissions.EMBED_LINKS)
+    }
+
+    fun canUseChannel(channel: IChannel): Boolean {
+        return hasPermissionInChannel(channel, Permissions.SEND_MESSAGES) &&
+                hasPermissionInChannel(channel, Permissions.READ_MESSAGES)
+    }
+
+    fun canDeleteInChannel(channel: IChannel): Boolean {
+        return hasPermissionInChannel(channel, Permissions.MANAGE_MESSAGES)
+    }
+
     fun onGameHosted(gameInfo: GameInfo) {
         log.info("A game has been hosted: ${gameInfo.name} (${gameInfo.playerCount})")
-        for ((_, target) in notificationTargets) {
-            target.processGameUpdate(gameInfo)
+        for ((channel, target) in notificationTargets) {
+            targetExecutor.submit {
+                target.processGameUpdate(gameInfo)
+            }
         }
     }
 
     fun onGameUpdated(gameInfo: GameInfo) {
         log.info("A game has been updated: ${gameInfo.oldName} (${gameInfo.oldPlayerCount}) -> (${gameInfo.playerCount}) ${gameInfo.name}")
-        for ((_, target) in notificationTargets) {
-            target.processGameUpdate(gameInfo)
+        for ((channel, target) in notificationTargets) {
+            targetExecutor.submit {
+                target.processGameUpdate(gameInfo)
+            }
         }
     }
 
     fun onGameRemoved(gameInfo: GameInfo) {
         log.info("A game has been removed: ${gameInfo.name} (${gameInfo.playerCount})")
-        for ((_, target) in notificationTargets) {
-            target.processGameRemove(gameInfo)
+        for ((channel, target) in notificationTargets) {
+            targetExecutor.submit {
+                target.processGameRemove(gameInfo)
+            }
         }
     }
 
     private fun handleBotLoad(event: ReadyEvent) {
         retrieveSettings()
 
+        client.changeUsername("Scanner-chan")
         watcher.start()
         log.info("Watcher started.")
     }
 
     private fun handleMessage(event: MessageReceivedEvent) {
         dispatchCommand(event.message)
+
+        val notificationTarget = notificationTargets[event.channel]
+
+        if (notificationTarget != null) {
+            notificationTarget.renewInfoMessage()
+        }
     }
 }
