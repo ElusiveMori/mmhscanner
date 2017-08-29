@@ -35,16 +35,18 @@ class ChatBot {
 
     init {
         val internalThreadFactory = Executors.defaultThreadFactory()
+        var handlerCounter = 0
         val listenerThreadFactory = ThreadFactory {
             val thread = internalThreadFactory.newThread(it)
-            thread.name = "Handler Thread"
+            thread.name = "Handler Thread - ${handlerCounter++}"
             thread.isDaemon = false
             return@ThreadFactory thread
         }
 
+        var requestCounter = 0
         val requestThreadFactory = ThreadFactory {
             val thread = internalThreadFactory.newThread(it)
-            thread.name = "Request Thread"
+            thread.name = "Request Thread - ${requestCounter++}"
             thread.isDaemon = false
             return@ThreadFactory thread
         }

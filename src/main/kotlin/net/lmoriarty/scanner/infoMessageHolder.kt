@@ -18,8 +18,18 @@ class InfoMessageHolder(val channel: IChannel) {
     private val cancellationExecutor: ExecutorService
 
     init {
-        updateExecutor = Executors.newSingleThreadScheduledExecutor()
-        cancellationExecutor = Executors.newSingleThreadExecutor()
+
+
+        updateExecutor = Executors.newSingleThreadScheduledExecutor {
+            val thread = Executors.defaultThreadFactory().newThread(it)
+            thread.name = "InfoMessageHolderUpdate - ${channel.name}/${channel.guild.name}"
+            return@newSingleThreadScheduledExecutor thread
+        }
+        cancellationExecutor = Executors.newSingleThreadExecutor {
+            val thread = Executors.defaultThreadFactory().newThread(it)
+            thread.name = "InfoMessageHolderCancellation - ${channel.name}/${channel.guild.name}"
+            return@newSingleThreadExecutor thread
+        }
     }
 
     private fun editInfoMessage() {
