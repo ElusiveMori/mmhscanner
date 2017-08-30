@@ -24,6 +24,7 @@ enum class GameType(pattern: String) {
     LOAD("""(\bload\b|life of a dragon)"""),
     MZI("""(mzi|medieval zombie invasion|medieval zombie|riverlands|winterscape|cityscape)"""),
     ROTK("""(rotk|three kingdoms)"""),
+    SPIDER_INVASION("""(spider invasion)"""),
     RP("""(roleplay|\brp\b)""");
 
     val regex = Regex(pattern)
