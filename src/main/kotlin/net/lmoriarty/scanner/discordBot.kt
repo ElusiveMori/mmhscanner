@@ -112,7 +112,7 @@ class ChatBot {
 
         if (target != null) {
             for ((_, info) in watcher.getAll()) {
-                if (info.gameType in types) {
+                if (info.type in types) {
                     target.processGameRemove(info)
                 }
             }

@@ -19,9 +19,7 @@ class NotificationTarget(val channel: IChannel,
                          types: Set<GameType> = HashSet()) {
     val types: MutableSet<GameType> = HashSet(types)
 
-    // use a treemap for strict ordering
-    private val watchedGames = TreeMap<String, GameInfo>()
-
+    private val watchedGames = TreeMap<Long, GameInfo>()
     private val infoMessageHolder = InfoMessageHolder(channel)
     private val notificationMessagesHolder = NotificationMessagesHolder(channel)
 
@@ -38,7 +36,11 @@ class NotificationTarget(val channel: IChannel,
     }
 
     private fun getGameInfoString(info: GameInfo, padding: Int): String {
-        return "${info.botName + " ".repeat(padding - info.botName.length)} --- (${info.playerCount}) ${info.name}"
+        return "${info.bot + " ".repeat(padding - info.bot.length)} --- (${info.playerCount}) ${info.name}"
+    }
+
+    private fun getLongestBotName(): Int {
+        return watchedGames.maxBy { it.value.bot.length }?.value?.bot?.length ?: 0
     }
 
     private fun buildGameListStringEmbed(): String {
@@ -47,8 +49,8 @@ class NotificationTarget(val channel: IChannel,
         } else {
             var message = ""
 
-            val longestBotName = watchedGames.maxBy { it.key.length }?.key?.length ?: 0
-            for ((bot, info) in watchedGames) {
+            val longestBotName = getLongestBotName()
+            for ((_, info) in watchedGames) {
                 message += "`${getGameInfoString(info, longestBotName)}`\n"
             }
 
@@ -62,8 +64,8 @@ class NotificationTarget(val channel: IChannel,
         } else {
             var message = "```"
 
-            val longestBotName = watchedGames.maxBy { it.key.length }?.key?.length ?: 0
-            for ((bot, info) in watchedGames) {
+            val longestBotName = getLongestBotName()
+            for ((_, info) in watchedGames) {
                 message += "| ${getGameInfoString(info, longestBotName)}\n"
             }
 
@@ -167,13 +169,13 @@ class NotificationTarget(val channel: IChannel,
     }
 
     private fun updateGame(info: GameInfo) {
-        watchedGames[info.botName] = info
+        watchedGames[info.id] = info
         sendNotification(info)
         updateMessage()
     }
 
     private fun removeGame(info: GameInfo) {
-        watchedGames.remove(info.botName)
+        watchedGames.remove(info.id)
         removeNotification(info)
         updateMessage()
     }
@@ -184,7 +186,7 @@ class NotificationTarget(val channel: IChannel,
      */
     fun processGameUpdate(info: GameInfo) {
         synchronized(this) {
-            if (info.gameType in types) {
+            if (info.type in types) {
                 updateGame(info)
             }
         }
@@ -196,7 +198,7 @@ class NotificationTarget(val channel: IChannel,
      */
     fun processGameRemove(info: GameInfo) {
         synchronized(this) {
-            if (info.gameType in types) {
+            if (info.type in types) {
                 removeGame(info)
             }
         }

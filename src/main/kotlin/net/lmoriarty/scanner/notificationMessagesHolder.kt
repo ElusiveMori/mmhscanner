@@ -8,15 +8,15 @@ import sx.blah.discord.handle.obj.IMessage
  * and their lifecycle
  */
 class NotificationMessagesHolder(val channel: IChannel) {
-    private val notificationMessages = HashMap<String, IMessage>()
+    private val notificationMessages = HashMap<Long, IMessage>()
 
     /**
      * Sends a notification (once) for this game info
      */
     fun sendNotification(info: GameInfo): Boolean {
         synchronized(this) {
-            if (info.botName !in notificationMessages) {
-                notificationMessages[info.botName] = makeRequest {
+            if (info.id !in notificationMessages) {
+                notificationMessages[info.id] = makeRequest {
                     channel.sendMessage("@here A game has been hosted! `${info.name}`")
                 }
 
@@ -32,7 +32,7 @@ class NotificationMessagesHolder(val channel: IChannel) {
      */
     fun removeNotification(info: GameInfo) {
         synchronized(this) {
-            val message = notificationMessages[info.botName]
+            val message = notificationMessages[info.id]
 
             if (message != null) {
                 message.delete()

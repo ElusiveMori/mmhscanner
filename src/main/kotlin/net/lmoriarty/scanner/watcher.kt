@@ -5,13 +5,14 @@ import kotlin.concurrent.timer
 /**
  * Holds info about a single MMH bot account, as much as is relevant to us.
  */
-data class GameInfo(var name: String,
-                    var updated: Boolean,
-                    var gameType: GameType,
-                    var oldName: String,
-                    var botName: String,
+data class GameInfo(val id: Long,
+                    var name: String,
+                    var oldName: String = "",
+                    var type: GameType,
+                    var bot: String,
                     var playerCount: String,
-                    var oldPlayerCount: String)
+                    var oldPlayerCount: String = "",
+                    var updated: Boolean = false)
 
 enum class GameType(pattern: String) {
     ROTRP("""(rotrp)"""),
@@ -36,6 +37,7 @@ val ignoreRegex = Regex("""(\bpl\b|\bru\b|\bfr\b|\brus\b|\bger\b)""")
 class Watcher(val bot: ChatBot) {
     // key is mmh bot account name
     private val registry: MutableMap<String, GameInfo> = HashMap()
+    private var idCounter = 0L
 
     fun start() {
         timer(name = "Watcher", initialDelay = 5000, period = 5000, action = {scan()})
@@ -71,7 +73,7 @@ class Watcher(val bot: ChatBot) {
 
                 // we already had a tracked game on this bot
                 if (info != null) {
-                    if (info.gameType == gameType) {
+                    if (info.type == gameType) {
                         // update if name and/or playercount got changed
                         if (info.name != data.currentGame || info.playerCount != data.playerCount) {
                             info.oldName = info.name
@@ -91,7 +93,12 @@ class Watcher(val bot: ChatBot) {
 
                 // a new game has been hosted on the bot
                 if (info == null) {
-                    info = GameInfo(data.currentGame, false, gameType, "", data.botName, data.playerCount, "")
+                    info = GameInfo(id = idCounter++,
+                                    name = data.currentGame,
+                                    playerCount = data.playerCount,
+                                    bot = data.botName,
+                                    type = gameType
+                                    )
                     bot.onGameHosted(info)
                     registry[data.botName] = info
                 }
