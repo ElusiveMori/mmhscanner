@@ -20,11 +20,12 @@ enum class GameType(pattern: String, val roles: List<String>) {
     SOTDRP          ("""(sotdrp)""", listOf("SotDRP")),
     AOC             ("""(\baoc\b|aocl|aocrp)""", listOf("AOC")),
     GCG             ("""(gcg|guilty crown)""", listOf()),
-    TL              ("""(\bkot\b|titans land|titan land|\btl\b)""", listOf("TL", "Titan's Land", "Titan Land")),
+    TL              ("""(\bkot\b|titans land|titan land|titanland|\btl\b)""", listOf("TL", "Titan's Land", "Titan Land")),
     LOAD            ("""(\bload\b|life of a dragon)""", listOf("LoaD")),
     MZI             ("""(mzi|medieval zombie invasion|medieval zombie|riverlands|winterscape|cityscape)""", listOf("MZI")),
     ROTK            ("""(rotk|three kingdoms)""", listOf("Strategist")),
-    SPIDER_INVASION ("""(spider invasion)""", listOf("Spider")),
+    SPIDER_INVASION ("""(spider invasion)""", listOf()),
+    AZEROTH         ("""(azeroth rp|azzy|kacpa)""", listOf("Azeroth")),
     RP              ("""(roleplay|\brp\b)""", listOf("WC3"));
 
     val regex = Regex(pattern)
