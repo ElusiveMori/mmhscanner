@@ -333,6 +333,7 @@ class ChatBot {
     private fun handleBotLoad(event: ReadyEvent) {
         retrieveSettings()
 
+        client.streaming("with your feelings!", null)
         client.changeUsername("Scanner-chan")
         watcher.start()
         log.info("Watcher started.")
