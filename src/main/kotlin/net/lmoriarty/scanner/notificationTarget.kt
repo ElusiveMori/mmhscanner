@@ -3,6 +3,7 @@ package net.lmoriarty.scanner
 import sx.blah.discord.api.internal.json.objects.EmbedObject
 import sx.blah.discord.handle.obj.IChannel
 import sx.blah.discord.handle.obj.IMessage
+import sx.blah.discord.handle.obj.IRole
 import sx.blah.discord.util.EmbedBuilder
 import java.awt.Color
 import java.util.*
@@ -22,9 +23,27 @@ class NotificationTarget(val channel: IChannel,
     private val watchedGames = TreeMap<Long, GameInfo>()
     private val infoMessageHolder = InfoMessageHolder(channel)
     private val notificationMessagesHolder = NotificationMessagesHolder(channel)
+    private val typeRoles = HashMap<GameType, IRole>()
 
     init {
         log.info("NotificationTarget created for channel ${channel.name} in ${channel.guild.name}")
+        updateRoles()
+    }
+
+    private fun updateRoles() {
+        typeRoles.clear()
+
+        for (type in types) {
+            roleLoop@ for (roleName in type.roles) {
+                for (role in channel.guild.roles) {
+                    if (role.name.contains(roleName, true)) {
+                        typeRoles[type] = role
+                        log.info("${channel.name}/${channel.guild.name} : ${type} -> ${role.name}")
+                        break@roleLoop
+                    }
+                }
+            }
+        }
     }
 
     private fun buildHeaderStringEmbed(): String {
@@ -118,9 +137,17 @@ class NotificationTarget(val channel: IChannel,
         }
     }
 
+    private fun getMentionForInfo(info: GameInfo): String {
+        if (typeRoles.isEmpty()) {
+            return "@here"
+        } else {
+            return typeRoles[info.type]?.mention() ?: ""
+        }
+    }
+
     private fun sendNotification(info: GameInfo) {
         if (bot.canUseChannel(channel)) {
-            if (notificationMessagesHolder.sendNotification(info)) {
+            if (notificationMessagesHolder.sendNotification(info, getMentionForInfo(info))) {
                 renewInfoMessage()
             }
         } else {
@@ -229,6 +256,7 @@ class NotificationTarget(val channel: IChannel,
     fun addGameTypes(toAdd: Set<GameType>) {
         synchronized(this) {
             types.addAll(toAdd)
+            updateRoles()
         }
     }
 
@@ -239,6 +267,7 @@ class NotificationTarget(val channel: IChannel,
     fun removeGameTypes(toRemove: Set<GameType>) {
         synchronized(this) {
             types.removeAll(toRemove)
+            updateRoles()
         }
     }
 

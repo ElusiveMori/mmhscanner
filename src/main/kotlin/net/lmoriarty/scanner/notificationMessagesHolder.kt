@@ -13,11 +13,11 @@ class NotificationMessagesHolder(val channel: IChannel) {
     /**
      * Sends a notification (once) for this game info
      */
-    fun sendNotification(info: GameInfo): Boolean {
+    fun sendNotification(info: GameInfo, mention: String): Boolean {
         synchronized(this) {
             if (info.id !in notificationMessages) {
                 notificationMessages[info.id] = makeRequest {
-                    channel.sendMessage("@here A game has been hosted! `${info.name}`")
+                    channel.sendMessage("${mention} A game has been hosted! `${info.name}`")
                 }
 
                 return true

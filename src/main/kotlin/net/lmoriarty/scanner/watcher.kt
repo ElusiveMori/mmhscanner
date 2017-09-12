@@ -14,18 +14,18 @@ data class GameInfo(val id: Long,
                     var oldPlayerCount: String = "",
                     var updated: Boolean = false)
 
-enum class GameType(pattern: String) {
-    ROTRP("""(rotrp)"""),
-    YARP("""(yarp)"""),
-    SOTDRP("""(sotdrp)"""),
-    AOC("""(\baoc\b|aocl|aocrp)"""),
-    GCG("""(gcg|guilty crown)"""),
-    TL("""(\bkot\b|titans land|titan land|\btl\b)"""),
-    LOAD("""(\bload\b|life of a dragon)"""),
-    MZI("""(mzi|medieval zombie invasion|medieval zombie|riverlands|winterscape|cityscape)"""),
-    ROTK("""(rotk|three kingdoms)"""),
-    SPIDER_INVASION("""(spider invasion)"""),
-    RP("""(roleplay|\brp\b)""");
+enum class GameType(pattern: String, val roles: List<String>) {
+    ROTRP           ("""(rotrp)""", listOf("RotRP")),
+    YARP            ("""(yarp)""", listOf("YARP")),
+    SOTDRP          ("""(sotdrp)""", listOf("SotDRP")),
+    AOC             ("""(\baoc\b|aocl|aocrp)""", listOf("AOC")),
+    GCG             ("""(gcg|guilty crown)""", listOf()),
+    TL              ("""(\bkot\b|titans land|titan land|\btl\b)""", listOf("TL")),
+    LOAD            ("""(\bload\b|life of a dragon)""", listOf("LoaD")),
+    MZI             ("""(mzi|medieval zombie invasion|medieval zombie|riverlands|winterscape|cityscape)""", listOf("MZI")),
+    ROTK            ("""(rotk|three kingdoms)""", listOf("Strategist")),
+    SPIDER_INVASION ("""(spider invasion)""", listOf("Spider")),
+    RP              ("""(roleplay|\brp\b)""", listOf("WC3"));
 
     val regex = Regex(pattern)
 }
