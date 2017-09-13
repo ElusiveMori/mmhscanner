@@ -26,6 +26,8 @@ enum class GameType(pattern: String, val roles: List<String>) {
     ROTK            ("""(rotk|three kingdoms)""", listOf("Strategist")),
     SPIDER_INVASION ("""(spider invasion)""", listOf()),
     AZEROTH         ("""(azeroth rp|azzy|kacpa)""", listOf("Azeroth")),
+    FANTASY_LIFE    ("""(fantasy life|fl)""", listOf("Fantasy Life")),
+    EAW             ("""(eaw|europe at war)""", listOf("Strategist")),
     RP              ("""(roleplay|\brp\b)""", listOf("WC3"));
 
     val regex = Regex(pattern)
@@ -50,7 +52,7 @@ class Watcher(val bot: ChatBot) {
      * or null otherwise
      */
     private fun shouldWatch(row: GameRow): GameType? {
-        if (row.currentGame.toLowerCase().contains(ignoreRegex)) {
+        if (ignoreRegex.containsMatchIn(row.currentGame.toLowerCase())) {
             return null
         }
 
