@@ -28,7 +28,7 @@ enum class GameType(pattern: String, val roles: List<String>) {
     AZEROTH         ("""(azeroth rp|azzy|kacpa)""", listOf("Azeroth")),
     FANTASY_LIFE    ("""(fantasy life|fl)""", listOf("Fantasy Life")),
     EAW             ("""(eaw|europe at war)""", listOf("Strategist")),
-    RP              ("""(roleplay|\brp\b)""", listOf(""));
+    RP              ("""(roleplay|\brp\b)""", listOf());
 
     val regex = Regex(pattern)
 }
