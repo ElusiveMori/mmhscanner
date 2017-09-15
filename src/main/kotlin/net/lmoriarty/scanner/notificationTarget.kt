@@ -138,11 +138,7 @@ class NotificationTarget(val channel: IChannel,
     }
 
     private fun getMentionForInfo(info: GameInfo): String {
-        if (typeRoles.isEmpty()) {
-            return "@here"
-        } else {
-            return typeRoles[info.type]?.mention() ?: ""
-        }
+        return typeRoles[info.type]?.mention() ?: "@here"
     }
 
     private fun sendNotification(info: GameInfo) {
